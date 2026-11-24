@@ -13,7 +13,7 @@ Spec: `docs/phase1/SPEC.md`. Stack: `docs/DECISIONS.md`.
 
 | | |
 | --- | --- |
-| Current | **S4** — HTTP fetcher (waiting for your commit) |
+| Current | **P3** — Rendered Inventaire fixtures and selectors (waiting for your commit) |
 | Next | **S5** — Browser fetcher (Playwright) |
 
 Status values: `todo`, `doing`, `done`.
@@ -44,7 +44,7 @@ After F3: push `main`, then create and push `phase-1`.
 | --- | --- | --- | --- |
 | P1 | Pick one theme and three sites: A static, B JavaScript-rendered, C 500+ pages with pagination. At most one sandbox site | Approved. Committed as `a8b3de1` | done |
 | P2 | `docs/phase1/COMPLIANCE.md` (robots rules, terms, rate limit per site) and `config/sites.yaml` (seeds, allowed hosts, fetch mode, depth, page limit, rate, selectors) | Every site has a filled row and a config entry, validated at load. Committed as `27db5da` | done |
-| P3 | Save a few HTML pages per site into `tests/fixtures/` (fetched once, politely) | Fixtures committed with their source URL and date. Static pages and Inventaire's raw shell committed. Rendered Inventaire pages pending (Chromium download) | doing |
+| P3 | Save a few HTML pages per site into `tests/fixtures/` (fetched once, politely) | Fixtures committed with their source URL and date. All three sites, including rendered Inventaire pages; every `sites.yaml` selector matches a saved page | done |
 
 ## M3 — Crawl core (Task 2, 20 pts)
 
@@ -53,7 +53,7 @@ After F3: push `main`, then create and push `phase-1`.
 | S1 | URL normalization: scheme and host case, default ports, fragments, dot segments, sorted query, tracking parameters removed | **Required test area 1** passes (42 tests, including every link in saved pages) | done |
 | S2 | robots.txt checker (protego), cached in Redis per host, honours our User-Agent | **Required test area 2** passes against saved robots files (27 unit tests + 1 real-Redis test in CI) | done |
 | S3 | Shared per-domain token bucket (Redis Lua script) | Test: 8 concurrent clients at 1 req/s get ≈1 req/s in total. Measured on real Redis 7: 8 workers at 4 req/s → 4.00 req/s | done |
-| S4 | HTTP fetcher (httpx): timeouts, descriptive User-Agent, conditional `ETag` / `If-Modified-Since`, error classes (retryable vs permanent), `Retry-After` parsing | Unit tests with mocked transport (37), including robots-blocked URLs never requested and 429 pausing the whole host | doing |
+| S4 | HTTP fetcher (httpx): timeouts, descriptive User-Agent, conditional `ETag` / `If-Modified-Since`, error classes (retryable vs permanent), `Retry-After` parsing | Unit tests with mocked transport (37), including robots-blocked URLs never requested and 429 pausing the whole host | done |
 | S5 | Browser fetcher (Playwright), selected per site by `fetch_mode` in config, started only when needed | Site B fixture renders and static sites never start a browser | todo |
 | S6 | Frontier: link extraction with the parser, allowed-host, depth and page-count limits, shared seen-set in Redis | Tests for each limit, and seen-set shared across two clients | todo |
 

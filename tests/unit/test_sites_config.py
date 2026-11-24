@@ -107,3 +107,17 @@ def test_invalid_site_is_rejected(overrides: dict[str, Any]) -> None:
 def test_duplicate_keys_are_rejected() -> None:
     with pytest.raises(ValidationError):
         SitesFile.model_validate({"sites": [_minimal_site(), _minimal_site()]})
+
+
+@pytest.mark.parametrize(
+    "field",
+    [
+        {"selector": "div", "key": ".k"},  # key without value
+        {"selector": "div", "key": ".k", "value": ".v", "attr": "href"},
+        {"selector": "div", "key": ".k", "value": ".v", "many": True},
+        {"selector": ""},
+    ],
+)
+def test_invalid_field_rule_is_rejected(field: dict[str, Any]) -> None:
+    with pytest.raises(ValidationError):
+        SitesFile.model_validate({"sites": [_minimal_site(fields={"f": field})]})

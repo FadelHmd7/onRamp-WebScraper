@@ -16,12 +16,31 @@ from onramp_scraper.config import get_settings
 
 
 class FieldRule(BaseModel):
-    """A site-specific value: CSS selector, and optionally the attribute to read."""
+    """How to pull one site-specific value out of a page with CSS selectors.
+
+    - ``selector`` alone: the text of the first match.
+    - ``attr``: an attribute of the first match instead of its text.
+    - ``many``: every match, as a list (for example several authors).
+    - ``key`` + ``value``: every match becomes one pair, read from these two
+      sub-selectors, and the field is a dictionary (for example an infobox
+      of "First publication date: 1813" rows).
+    """
 
     model_config = ConfigDict(extra="forbid")
 
     selector: str = Field(min_length=1)
     attr: str | None = None
+    many: bool = False
+    key: str | None = None
+    value: str | None = None
+
+    @model_validator(mode="after")
+    def check_mode(self) -> Self:
+        if (self.key is None) != (self.value is None):
+            raise ValueError("key and value must be given together")
+        if self.key is not None and (self.attr is not None or self.many):
+            raise ValueError("key/value pairs cannot be combined with attr or many")
+        return self
 
 
 class SiteConfig(BaseModel):

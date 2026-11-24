@@ -45,7 +45,7 @@ sites:
     fetch_mode: browser
     # Raw HTML is an empty shell; wait until the app has finished loading data.
     browser_wait_until: networkidle
-    browser_wait_for: main
+    browser_wait_for: .top-section h2     # the entity name: present once data has loaded
     # Authors who also have books on Standard Ebooks (overlap for Phase 2).
     seeds:
       - https://inventaire.io/entity/wd:Q36322   # Jane Austen
@@ -60,7 +60,20 @@ sites:
     max_depth: 2           # author -> work -> edition
     max_pages: 150
     requests_per_second: 0.1   # robots.txt Crawl-delay: 10
-    fields: {}             # set in P3 from a rendered page
+    # From rendered pages (tests/fixtures/inventaire). Svelte adds generated
+    # classes such as "svelte-vpir1l" that change on every deploy; these
+    # selectors use only the stable, meaningful class names.
+    fields:
+      name: {selector: ".top-section h2"}
+      entity_type: {selector: "h2.type-label"}               # Author, Work, Edition
+      authors: {selector: ".work-section .author-info .author-label", many: true}
+      summary: {selector: ".work-section .summary p"}
+      claims:                                                  # First publication date, Genre, ...
+        selector: ".work-section .claims-infobox .claim"
+        key: ".property"
+        value: ".values"
+      birth_year: {selector: '.birth-or-death-dates .date[title="date of birth"]'}
+      death_year: {selector: '.birth-or-death-dates .date[title="date of death"]'}
 
   # ------------------------------------------------------------ Site C: pagination
   - key: standard-ebooks
