@@ -13,8 +13,8 @@ Spec: `docs/phase1/SPEC.md`. Stack: `docs/DECISIONS.md`.
 
 | | |
 | --- | --- |
-| Current | **P3** — HTML fixtures (waiting for your commit; rendered Inventaire pages follow when Chromium finishes downloading) |
-| Next | **S1** — URL normalization |
+| Current | **S1** — URL normalization (waiting for your commit) |
+| Next | **S2** — robots.txt checker |
 
 Status values: `todo`, `doing`, `done`.
 
@@ -44,13 +44,13 @@ After F3: push `main`, then create and push `phase-1`.
 | --- | --- | --- | --- |
 | P1 | Pick one theme and three sites: A static, B JavaScript-rendered, C 500+ pages with pagination. At most one sandbox site | Approved. Committed as `a8b3de1` | done |
 | P2 | `docs/phase1/COMPLIANCE.md` (robots rules, terms, rate limit per site) and `config/sites.yaml` (seeds, allowed hosts, fetch mode, depth, page limit, rate, selectors) | Every site has a filled row and a config entry, validated at load. Committed as `27db5da` | done |
-| P3 | Save a few HTML pages per site into `tests/fixtures/` (fetched once, politely) | Fixtures committed with their source URL and date. Static pages and Inventaire's raw shell done; rendered Inventaire pages pending | doing |
+| P3 | Save a few HTML pages per site into `tests/fixtures/` (fetched once, politely) | Fixtures committed with their source URL and date. Static pages and Inventaire's raw shell committed. Rendered Inventaire pages pending (Chromium download) | doing |
 
 ## M3 — Crawl core (Task 2, 20 pts)
 
 | ID | Task | Done when | Status |
 | --- | --- | --- | --- |
-| S1 | URL normalization: scheme and host case, default ports, fragments, dot segments, sorted query, tracking parameters removed | **Required test area 1** passes | todo |
+| S1 | URL normalization: scheme and host case, default ports, fragments, dot segments, sorted query, tracking parameters removed | **Required test area 1** passes (42 tests, including every link in saved pages) | doing |
 | S2 | robots.txt checker (protego), cached in Redis per host, honours our User-Agent | **Required test area 2** passes against saved robots files | todo |
 | S3 | Shared per-domain token bucket (Redis Lua script) | Test: 8 concurrent clients at 1 req/s get ≈1 req/s in total | todo |
 | S4 | HTTP fetcher (httpx): timeouts, descriptive User-Agent, conditional `ETag` / `If-Modified-Since`, error classes (retryable vs permanent), `Retry-After` parsing | Unit tests with mocked transport | todo |
