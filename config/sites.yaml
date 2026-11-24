@@ -1,0 +1,109 @@
+# Per-site crawl configuration. Loaded and validated by onramp_scraper.sites.
+#
+# include / exclude: regular expressions matched against the URL path plus
+#   query (for example "/ebooks?page=2"). A URL is crawled only if it matches
+#   at least one include pattern and no exclude pattern. robots.txt is checked
+#   separately for every URL, so these patterns narrow the crawl; they never
+#   widen what robots.txt allows.
+# fetch_mode: "http" for plain requests, "browser" for Playwright rendering.
+# requests_per_second: shared by ALL workers for that host.
+# fields: site-specific values pulled with CSS selectors. "attr" reads an
+#   attribute instead of the element's text.
+#
+# Evidence for every rule here: docs/phase1/SITES.md and COMPLIANCE.md.
+
+sites:
+  # ------------------------------------------------------------ Site A: static
+  - key: books-toscrape
+    name: Books to Scrape (sandbox)
+    role: static
+    base_url: https://books.toscrape.com/
+    allowed_hosts: [books.toscrape.com]
+    fetch_mode: http
+    seeds:
+      - https://books.toscrape.com/index.html
+    include:
+      - ^/(index\.html)?$
+      - ^/catalogue/page-\d+\.html$
+      - ^/catalogue/[^/]+_\d+/index\.html$
+    exclude: []
+    max_depth: 60          # listing pages chain through 50 "next" links
+    max_pages: 300
+    requests_per_second: 2
+    fields:
+      price: {selector: "article.product_page p.price_color"}
+      availability: {selector: "article.product_page p.availability"}
+      rating: {selector: "article.product_page p.star-rating", attr: class}
+      category: {selector: "ul.breadcrumb li:nth-of-type(3) a"}
+
+  # ------------------------------------------------------------ Site B: JavaScript
+  - key: inventaire
+    name: Inventaire
+    role: javascript
+    base_url: https://inventaire.io/
+    allowed_hosts: [inventaire.io]
+    fetch_mode: browser
+    # Raw HTML is an empty shell; wait until the app has finished loading data.
+    browser_wait_until: networkidle
+    browser_wait_for: main
+    # Authors who also have books on Standard Ebooks (overlap for Phase 2).
+    seeds:
+      - https://inventaire.io/entity/wd:Q36322   # Jane Austen
+      - https://inventaire.io/entity/wd:Q5686    # Charles Dickens
+      - https://inventaire.io/entity/wd:Q47152   # Mary Shelley
+      - https://inventaire.io/entity/wd:Q7245    # Mark Twain
+      - https://inventaire.io/entity/wd:Q7243    # Leo Tolstoy
+    include:
+      # Entity pages only. robots.txt disallows /entity/*/* sub-pages.
+      - ^/entity/(wd|inv|isbn):[^/?#]+$
+    exclude: []
+    max_depth: 2           # author -> work -> edition
+    max_pages: 150
+    requests_per_second: 0.1   # robots.txt Crawl-delay: 10
+    fields: {}             # set in P3 from a rendered page
+
+  # ------------------------------------------------------------ Site C: pagination
+  - key: standard-ebooks
+    name: Standard Ebooks
+    role: paginated
+    base_url: https://standardebooks.org/
+    allowed_hosts: [standardebooks.org]
+    fetch_mode: http
+    seeds:
+      - https://standardebooks.org/ebooks?page=1
+    include:
+      - ^/ebooks\?page=\d+$
+      - ^/ebooks/[^/?#]+/[^/?#]+(/[^/?#]+)?$   # author/title[/translator]
+    exclude:
+      - /downloads(/|$)
+      - /text(/|$)
+      - ^/honeypot
+    max_depth: 140         # 129 listing pages chained by rel="next"
+    max_pages: 700
+    requests_per_second: 1
+    fields:
+      author: {selector: 'article.ebook a[property="schema:author"] span[property="schema:name"]'}
+      abstract: {selector: 'article.ebook > meta[property="schema:abstract"]', attr: content}
+      word_count: {selector: 'article.ebook meta[property="schema:wordCount"]', attr: content}
+      wikipedia_url: {selector: 'article.ebook > meta[property="schema:sameAs"]', attr: content}
+
+  # ------------------------------------------------------------ Local test site
+  - key: testsite
+    name: Local test site
+    role: test
+    base_url: http://testsite:8000/
+    allowed_hosts: [testsite]
+    fetch_mode: http
+    seeds:
+      - http://testsite:8000/catalog?page=1
+    include:
+      - ^/catalog\?page=\d+$
+      - ^/items/\d+$
+      - ^/editable(/[a-z0-9-]+)?$
+    exclude: []
+    max_depth: 40
+    max_pages: 700
+    requests_per_second: 100   # our own server; high so the benchmark measures workers
+    fields:
+      price: {selector: "article.item p.price"}
+      sku: {selector: "article.item", attr: data-sku}

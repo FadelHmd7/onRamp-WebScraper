@@ -5,6 +5,7 @@ from a clean checkout; `.env.example` lists every variable.
 """
 
 from functools import lru_cache
+from pathlib import Path
 
 from pydantic import Field
 from pydantic_settings import BaseSettings, SettingsConfigDict
@@ -22,6 +23,9 @@ class Settings(BaseSettings):
     database_url: str = "postgresql://scraper:scraper@postgres:5432/scraper"
     redis_url: str = "redis://redis:6379/0"
     broker_url: str = "amqp://scraper:scraper@rabbitmq:5672//"
+
+    # Per-site crawl rules (seeds, limits, fetch mode, selectors).
+    sites_file: Path = Path("config/sites.yaml")
 
     # Crawl limits. The per-domain rate is shared by every worker.
     default_max_depth: int = Field(default=2, ge=0)

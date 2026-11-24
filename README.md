@@ -10,6 +10,8 @@ A distributed, fault-tolerant web crawler for the onRamp bootcamp. Phase 1 crawl
 - [docs/phase1/TRACKER.md](docs/phase1/TRACKER.md) — ordered tasks and status
 - [docs/DECISIONS.md](docs/DECISIONS.md) — chosen stack, each with the alternative we rejected
 - [docs/phase1/SITES.md](docs/phase1/SITES.md) — theme, the three sites, and the candidates we rejected
+- [docs/phase1/COMPLIANCE.md](docs/phase1/COMPLIANCE.md) — robots.txt, terms and rate limits per site
+- [config/sites.yaml](config/sites.yaml) — per-site crawl rules: seeds, limits, fetch mode, rate, selectors
 
 ## Stack
 

@@ -31,6 +31,7 @@ ENV PATH="/app/.venv/bin:$PATH" \
 RUN useradd --create-home --uid 1000 app
 WORKDIR /app
 COPY --from=build --chown=app:app /app/.venv /app/.venv
+COPY --chown=app:app config ./config
 USER app
 
 # ---------------------------------------------------------------- api
