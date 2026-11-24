@@ -13,8 +13,8 @@ Spec: `docs/phase1/SPEC.md`. Stack: `docs/DECISIONS.md`.
 
 | | |
 | --- | --- |
-| Current | **F3** — Tooling and package layout (waiting for your commit) |
-| Next | Push `main`, create `phase-1`, then **E1** — Compose stack |
+| Current | **E1** — Compose stack (waiting for your commit) |
+| Next | **E2** — CI on every push |
 
 Status values: `todo`, `doing`, `done`.
 
@@ -26,7 +26,7 @@ Status values: `todo`, `doing`, `done`.
 | --- | --- | --- | --- |
 | F1 | Python package skeleton, `.gitignore`, `.env.example` | Committed as `4f58b31` | done |
 | F2 | Planning docs: spec restated, tracker rebuilt, stack decisions | Committed as `61ec486` | done |
-| F3 | Tooling: uv lockfile, ruff, pytest and mypy config, `.gitattributes` (LF endings), sub-package layout | `uv run ruff check .` and `uv run pytest` pass, with a smoke test so pytest has something to run | doing |
+| F3 | Tooling: uv lockfile, ruff, pytest and mypy config, `.gitattributes` (LF endings), sub-package layout | `uv run ruff check .` and `uv run pytest` pass, with a smoke test so pytest has something to run. Committed as `53172b2` | done |
 
 After F3: push `main`, then create and push `phase-1`.
 
@@ -34,7 +34,7 @@ After F3: push `main`, then create and push `phase-1`.
 
 | ID | Task | Done when | Status |
 | --- | --- | --- | --- |
-| E1 | `docker-compose.yml`: postgres, redis, rabbitmq, api stub, worker stub, ui placeholder. Healthchecks, settings from `.env`, no fixed name or port on `worker` | `docker compose up` is healthy and `docker compose up --scale worker=4` shows 4 workers | todo |
+| E1 | `docker-compose.yml`: postgres, redis, rabbitmq, api stub, worker stub, ui placeholder. Healthchecks, settings from `.env`, no fixed name or port on `worker` | `docker compose up` is healthy and `docker compose up --scale worker=4` shows 4 workers | doing |
 | E2 | GitHub Actions on every push: ruff, pytest (with Redis and Postgres services), build of every image | CI is green on `phase-1` | todo |
 | E3 | `testsite` container: 600 paginated pages, `/slow`, `/flaky`, `/429` with `Retry-After`, `/always-500`, editable pages for versioning, its own `robots.txt` | `curl` reaches each behaviour from inside the compose network | todo |
 

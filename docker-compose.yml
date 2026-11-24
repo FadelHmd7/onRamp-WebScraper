@@ -1,0 +1,111 @@
+# Start everything:          docker compose up --build
+# Run four workers:          docker compose up --build --scale worker=4
+#
+# Every setting has a default, so a clean checkout starts without a .env file.
+# Copy .env.example to .env to override any of them.
+
+name: onramp-scraper
+
+x-app-env: &app-env
+  APP_ENV: ${APP_ENV:-development}
+  LOG_LEVEL: ${LOG_LEVEL:-info}
+  USER_AGENT: "${USER_AGENT:-onRamp-WebScraper/0.1 (contact: you@example.com)}"
+  DATABASE_URL: postgresql://${POSTGRES_USER:-scraper}:${POSTGRES_PASSWORD:-scraper}@postgres:5432/${POSTGRES_DB:-scraper}
+  REDIS_URL: redis://redis:6379/0
+  BROKER_URL: amqp://${RABBITMQ_USER:-scraper}:${RABBITMQ_PASSWORD:-scraper}@rabbitmq:5672//
+  DEFAULT_MAX_DEPTH: ${DEFAULT_MAX_DEPTH:-2}
+  DEFAULT_MAX_PAGES: ${DEFAULT_MAX_PAGES:-50}
+  REQUESTS_PER_SECOND: ${REQUESTS_PER_SECOND:-1}
+  MAX_FETCH_ATTEMPTS: ${MAX_FETCH_ATTEMPTS:-5}
+
+x-backing-services: &backing-services
+  postgres:
+    condition: service_healthy
+  redis:
+    condition: service_healthy
+  rabbitmq:
+    condition: service_healthy
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-scraper}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-scraper}
+      POSTGRES_DB: ${POSTGRES_DB:-scraper}
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+    restart: unless-stopped
+
+  redis:
+    image: redis:7-alpine
+    # Append-only file: the seen-set and rate-limit state survive a restart.
+    command: ["redis-server", "--appendonly", "yes"]
+    volumes:
+      - redis-data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+    restart: unless-stopped
+
+  rabbitmq:
+    image: rabbitmq:4.1-management-alpine
+    environment:
+      RABBITMQ_DEFAULT_USER: ${RABBITMQ_USER:-scraper}
+      RABBITMQ_DEFAULT_PASS: ${RABBITMQ_PASSWORD:-scraper}
+    ports:
+      - "${RABBITMQ_UI_PORT:-15672}:15672"  # management console
+    volumes:
+      - rabbitmq-data:/var/lib/rabbitmq
+    healthcheck:
+      test: ["CMD", "rabbitmq-diagnostics", "-q", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+    restart: unless-stopped
+
+  api:
+    build:
+      context: .
+      target: api
+    environment: *app-env
+    ports:
+      - "${API_PORT:-9060}:8000"
+    depends_on: *backing-services
+    restart: unless-stopped
+
+  # No container_name and no published port, so `--scale worker=N` works.
+  # Each replica is a separate container that shares only the queue,
+  # database and cache.
+  worker:
+    build:
+      context: .
+      target: worker
+    environment: *app-env
+    depends_on: *backing-services
+    restart: unless-stopped
+    # Give a running job time to finish on `docker compose stop`.
+    # `docker kill` skips this, which is the crash demo.
+    stop_grace_period: 30s
+
+  ui:
+    build:
+      context: ui
+    ports:
+      - "${UI_PORT:-9070}:80"
+    depends_on:
+      api:
+        condition: service_healthy
+    restart: unless-stopped
+
+volumes:
+  postgres-data:
+  redis-data:
+  rabbitmq-data:

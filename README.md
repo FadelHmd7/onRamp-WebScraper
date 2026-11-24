@@ -36,6 +36,28 @@ Layout:
 
 ## Setup
 
-Copy `.env.example` to `.env` and set a real contact address in `USER_AGENT` before any crawl.
+Needs Docker with Compose v2. From a clean checkout:
 
-The stack does not start yet. Container startup is task E1.
+```
+docker compose up --build
+```
+
+No `.env` file is needed to start: every setting has a default. Before crawling real sites, copy `.env.example` to `.env` and put a real contact address in `USER_AGENT`.
+
+| Service | URL |
+| --- | --- |
+| Web UI | http://localhost:9070 |
+| API and Swagger | http://localhost:9060/docs |
+| RabbitMQ console | http://localhost:15672 (user `scraper`, password `scraper`) |
+
+Change the host ports with `UI_PORT`, `API_PORT` and `RABBITMQ_UI_PORT` in `.env`.
+
+## Scaling workers
+
+Each worker is its own container and runs one job at a time. Run four:
+
+```
+docker compose up --build --scale worker=4
+```
+
+Change the count on a running stack with `docker compose up -d --scale worker=N`. Workers hold no state, so you can add or remove them at any time.
