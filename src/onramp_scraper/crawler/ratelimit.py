@@ -50,6 +50,21 @@ return wait
 """
 
 
+_PAUSE_HOST = """
+local key = KEYS[1]
+local pause = tonumber(ARGV[1])           -- microseconds
+local t = redis.call('TIME')
+local now = tonumber(t[1]) * 1000000 + tonumber(t[2])
+local next_free = tonumber(redis.call('GET', key) or now)
+local resume = now + pause
+if resume > next_free then
+  local ttl_ms = math.ceil(pause / 1000) + 1000
+  redis.call('SET', key, string.format('%.0f', resume), 'PX', ttl_ms)
+end
+return 0
+"""
+
+
 def effective_rate(requests_per_second: float, crawl_delay: float | None) -> float:
     """Our configured rate, lowered further if the site's Crawl-delay asks for it."""
     if crawl_delay and crawl_delay > 0:
@@ -60,6 +75,7 @@ def effective_rate(requests_per_second: float, crawl_delay: float | None) -> flo
 class RateLimiter:
     def __init__(self, redis: Redis, sleep: Callable[[float], None] = time.sleep) -> None:
         self._reserve_slot = redis.register_script(_RESERVE_SLOT)
+        self._pause_host = redis.register_script(_PAUSE_HOST)
         self._sleep = sleep
 
     def reserve(self, host: str, requests_per_second: float, burst: int = 1) -> float:
@@ -71,6 +87,16 @@ class RateLimiter:
         interval_us = math.ceil(1_000_000 / requests_per_second)
         wait_us = int(self._reserve_slot(keys=[f"ratelimit:{host}"], args=[interval_us, burst]))
         return wait_us / 1_000_000
+
+    def pause(self, host: str, seconds: float) -> None:
+        """Hold back every worker's next request to ``host`` for ``seconds``.
+
+        Used when a site answers 429 or 503 with Retry-After: the site asked
+        all of us to wait, not just the worker that got the answer. Never
+        shortens a pause that is already longer.
+        """
+        if seconds > 0:
+            self._pause_host(keys=[f"ratelimit:{host}"], args=[math.ceil(seconds * 1_000_000)])
 
     def wait(self, host: str, requests_per_second: float, burst: int = 1) -> float:
         """Block until this worker may send its next request to ``host``."""
