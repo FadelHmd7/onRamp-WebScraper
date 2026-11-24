@@ -1,5 +1,7 @@
 # onRamp-WebScraper
 
+[![CI](https://github.com/FadelHmd7/onRamp-WebScraper/actions/workflows/ci.yml/badge.svg)](https://github.com/FadelHmd7/onRamp-WebScraper/actions/workflows/ci.yml)
+
 A distributed, fault-tolerant web crawler for the onRamp bootcamp. Phase 1 crawls three websites on one theme, then cleans, versions and serves the pages through an authenticated API and a web UI.
 
 ## Documents
@@ -23,6 +25,8 @@ uv run ruff format .    # format
 uv run mypy             # type-check src/
 uv run pytest           # unit tests
 ```
+
+CI ([.github/workflows/ci.yml](.github/workflows/ci.yml)) runs on every push: lint and type checks, unit tests, then it builds every image, starts the stack with two workers and checks that both are consuming from the queue.
 
 Layout:
 

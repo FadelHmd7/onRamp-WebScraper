@@ -13,8 +13,8 @@ Spec: `docs/phase1/SPEC.md`. Stack: `docs/DECISIONS.md`.
 
 | | |
 | --- | --- |
-| Current | **E1** — Compose stack (waiting for your commit) |
-| Next | **E2** — CI on every push |
+| Current | **E2** — CI on every push (waiting for your commit) |
+| Next | **E3** — `testsite` container |
 
 Status values: `todo`, `doing`, `done`.
 
@@ -34,8 +34,8 @@ After F3: push `main`, then create and push `phase-1`.
 
 | ID | Task | Done when | Status |
 | --- | --- | --- | --- |
-| E1 | `docker-compose.yml`: postgres, redis, rabbitmq, api stub, worker stub, ui placeholder. Healthchecks, settings from `.env`, no fixed name or port on `worker` | `docker compose up` is healthy and `docker compose up --scale worker=4` shows 4 workers | doing |
-| E2 | GitHub Actions on every push: ruff, pytest (with Redis and Postgres services), build of every image | CI is green on `phase-1` | todo |
+| E1 | `docker-compose.yml`: postgres, redis, rabbitmq, api stub, worker stub, ui placeholder. Healthchecks, settings from `.env`, no fixed name or port on `worker` | `docker compose up` is healthy and `docker compose up --scale worker=4` shows 4 workers. Verified: 4 consumers, 8 jobs split 2 per worker | done |
+| E2 | GitHub Actions on every push: ruff, pytest (with Redis and Postgres services), build of every image | CI is green on `phase-1` | doing |
 | E3 | `testsite` container: 600 paginated pages, `/slow`, `/flaky`, `/429` with `Retry-After`, `/always-500`, editable pages for versioning, its own `robots.txt` | `curl` reaches each behaviour from inside the compose network | todo |
 
 ## M2 — Sites and compliance

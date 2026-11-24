@@ -1,0 +1,100 @@
+# Runs on every push to any branch and on pull requests:
+#   lint   — ruff (lint + format) and mypy
+#   test   — pytest, with Redis and Postgres available for integration tests
+#   build  — builds every image, starts the stack with 2 workers, checks it
+#
+# Actions are pinned to commit SHAs (a tag can be moved, a commit cannot).
+
+name: CI
+
+on:
+  push:
+  pull_request:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  lint:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: astral-sh/setup-uv@1db35dd8eee11c5894872e0b383ae6c406cf738d # v10.4.0
+        with:
+          version: "0.13.9"
+          enable-cache: true
+      - name: Install dependencies
+        run: uv sync --locked
+      - name: Ruff lint
+        run: uv run ruff check --output-format=github .
+      - name: Ruff format
+        run: uv run ruff format --check .
+      - name: Mypy
+        run: uv run mypy
+
+  test:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    services:
+      redis:
+        image: redis:7-alpine
+        ports: ["6379:6379"]
+        options: >-
+          --health-cmd "redis-cli ping" --health-interval 5s --health-timeout 3s --health-retries 10
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: scraper
+          POSTGRES_PASSWORD: scraper
+          POSTGRES_DB: scraper
+        ports: ["5432:5432"]
+        options: >-
+          --health-cmd "pg_isready -U scraper" --health-interval 5s --health-timeout 3s --health-retries 10
+    env:
+      REDIS_URL: redis://localhost:6379/0
+      DATABASE_URL: postgresql://scraper:scraper@localhost:5432/scraper
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: astral-sh/setup-uv@1db35dd8eee11c5894872e0b383ae6c406cf738d # v10.4.0
+        with:
+          version: "0.13.9"
+          enable-cache: true
+      - name: Install dependencies
+        run: uv sync --locked
+      - name: Pytest
+        run: uv run pytest
+
+  build:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: docker/setup-buildx-action@f87e5991a6d7451dcb8d9637bfbc97413f497069 # v4.4.1
+      - name: Build all images
+        run: docker compose build
+      - name: Start the stack with 2 workers
+        run: docker compose up -d --scale worker=2 --wait --wait-timeout 180
+      - name: Smoke test
+        run: |
+          set -euo pipefail
+          curl -fsS http://localhost:9060/health
+          curl -fsS http://localhost:9070/api/health
+          # Workers connect a few seconds after their container starts.
+          for _ in $(seq 1 30); do
+            consumers=$(docker compose exec -T rabbitmq rabbitmqctl -q list_queues name consumers | awk '$1=="crawl"{print $2}')
+            [ "${consumers:-0}" = "2" ] && break
+            sleep 2
+          done
+          echo "crawl queue consumers: ${consumers:-0}"
+          test "${consumers:-0}" = "2"
+      - name: Logs on failure
+        if: failure()
+        run: docker compose logs --no-color
+      - name: Stop the stack
+        if: always()
+        run: docker compose down -v
