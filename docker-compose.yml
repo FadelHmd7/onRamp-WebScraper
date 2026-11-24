@@ -105,6 +105,19 @@ services:
         condition: service_healthy
     restart: unless-stopped
 
+  # Local test site: 630 pages, failure modes and editable pages.
+  # Workers reach it at http://testsite:8000. The host port is bound to
+  # 127.0.0.1 because its /_admin routes have no auth.
+  testsite:
+    build:
+      context: .
+      target: testsite
+    environment:
+      TESTSITE_LATENCY_MS: ${TESTSITE_LATENCY_MS:-50}
+    ports:
+      - "127.0.0.1:${TESTSITE_PORT:-9050}:8000"
+    restart: unless-stopped
+
 volumes:
   postgres-data:
   redis-data:

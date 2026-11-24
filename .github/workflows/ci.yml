@@ -84,6 +84,10 @@ jobs:
           set -euo pipefail
           curl -fsS http://localhost:9060/health
           curl -fsS http://localhost:9070/api/health
+          curl -fsS http://localhost:9050/robots.txt
+          curl -fsS -o /dev/null http://localhost:9050/items/1
+          # Workers must reach the test site by its service name.
+          docker compose exec -T worker python -c "import urllib.request; urllib.request.urlopen('http://testsite:8000/health', timeout=5)"
           # Workers connect a few seconds after their container starts.
           for _ in $(seq 1 30); do
             consumers=$(docker compose exec -T rabbitmq rabbitmqctl -q list_queues name consumers | awk '$1=="crawl"{print $2}')

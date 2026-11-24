@@ -1,6 +1,7 @@
 # One image recipe for every Python component. Build targets:
 #   api     — FastAPI served by uvicorn
-#   worker  — Celery worker (Playwright and Chromium are added in task S5)
+#   worker    — Celery worker (Playwright and Chromium are added in task S5)
+#   testsite  — local test site for failure demos and the benchmark
 
 ARG PYTHON_VERSION=3.12
 
@@ -45,3 +46,10 @@ FROM runtime AS worker
 CMD ["celery", "--app", "onramp_scraper.worker.app", "worker", \
      "--hostname", "worker@%h", "--queues", "crawl", \
      "--concurrency", "1", "--prefetch-multiplier", "1", "--loglevel", "INFO"]
+
+# ---------------------------------------------------------------- testsite
+FROM runtime AS testsite
+EXPOSE 8000
+HEALTHCHECK --interval=10s --timeout=3s --start-period=5s --retries=5 \
+    CMD ["python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/health', timeout=2)"]
+CMD ["uvicorn", "onramp_testsite.app:app", "--host", "0.0.0.0", "--port", "8000", "--no-access-log"]

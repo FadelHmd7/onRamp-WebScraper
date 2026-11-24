@@ -53,8 +53,32 @@ No `.env` file is needed to start: every setting has a default. Before crawling 
 | Web UI | http://localhost:9070 |
 | API and Swagger | http://localhost:9060/docs |
 | RabbitMQ console | http://localhost:15672 (user `scraper`, password `scraper`) |
+| Test site | http://localhost:9050 (local only) |
 
-Change the host ports with `UI_PORT`, `API_PORT` and `RABBITMQ_UI_PORT` in `.env`.
+Change the host ports with `UI_PORT`, `API_PORT`, `RABBITMQ_UI_PORT` and `TESTSITE_PORT` in `.env`.
+
+## Test site
+
+`testsite` is a local site we control, so failure demos and the benchmark never stress a real server. Workers reach it at `http://testsite:8000`.
+
+| Path | Behaviour |
+| --- | --- |
+| `/catalog?page=1..30`, `/items/1..600` | 630 linked pages with nav, footer, ads, lists and tables |
+| `/js/items/{id}` | Content appears only after JavaScript runs |
+| `/editable/{slug}` | Pages to change between crawls (versioning demo) |
+| `/slow/{id}?delay=10` | Answers after the delay (timeout demo) |
+| `/flaky/{id}?fail=2` | 503 for the first N requests, then 200 |
+| `/throttle/{id}?retry_after=5` | 429 with `Retry-After` until the time passes |
+| `/broken/{id}` | 503 forever (dead-letter demo) |
+| `/private/...` | Disallowed by its `robots.txt` |
+
+Every page sends `ETag` and `Last-Modified` and answers 304 when unchanged. Edit, delete and reset:
+
+```
+curl -X PUT localhost:9050/_admin/editable/pricing -H "Content-Type: application/json"      -d '{"title": "Pricing", "paragraphs": ["The basic plan now costs $12."]}'
+curl -X DELETE localhost:9050/_admin/editable/team
+curl -X POST localhost:9050/_admin/reset
+```
 
 ## Scaling workers
 
