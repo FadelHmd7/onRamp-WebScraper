@@ -1,0 +1,13 @@
+# Store and check out text files with LF endings. Containers run Linux,
+# and a shell script with CRLF endings fails there.
+* text=auto eol=lf
+
+# Windows-only scripts keep CRLF.
+*.ps1 text eol=crlf
+*.bat text eol=crlf
+
+# Binary files are never converted.
+*.png binary
+*.jpg binary
+*.pdf binary
+*.ico binary

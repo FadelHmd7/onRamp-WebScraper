@@ -13,8 +13,8 @@ Spec: `docs/phase1/SPEC.md`. Stack: `docs/DECISIONS.md`.
 
 | | |
 | --- | --- |
-| Current | **F2** — Planning docs |
-| Next | **F3** — Tooling and package layout, then push `main` and create `phase-1` |
+| Current | **F3** — Tooling and package layout (waiting for your commit) |
+| Next | Push `main`, create `phase-1`, then **E1** — Compose stack |
 
 Status values: `todo`, `doing`, `done`.
 
@@ -25,8 +25,8 @@ Status values: `todo`, `doing`, `done`.
 | ID | Task | Done when | Status |
 | --- | --- | --- | --- |
 | F1 | Python package skeleton, `.gitignore`, `.env.example` | Committed as `4f58b31` | done |
-| F2 | Planning docs: spec restated, tracker rebuilt, stack decisions | `docs/` reviewed and committed | doing |
-| F3 | Tooling: uv lockfile, ruff, pytest and mypy config, `.gitattributes` (LF endings), sub-package layout | `uv run ruff check .` and `uv run pytest` pass on an empty test suite | todo |
+| F2 | Planning docs: spec restated, tracker rebuilt, stack decisions | Committed as `61ec486` | done |
+| F3 | Tooling: uv lockfile, ruff, pytest and mypy config, `.gitattributes` (LF endings), sub-package layout | `uv run ruff check .` and `uv run pytest` pass, with a smoke test so pytest has something to run | doing |
 
 After F3: push `main`, then create and push `phase-1`.
 
