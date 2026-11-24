@@ -1,0 +1,8 @@
+User-agent: *
+Disallow: /entity/new
+Disallow: /entity/*/*$
+Disallow: /items
+Disallow: /search
+Disallow: /tasks
+Disallow: /transactions
+Crawl-delay: 10
