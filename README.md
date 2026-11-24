@@ -1,22 +1,19 @@
 # onRamp-WebScraper
 
-Phase 1 of the onRamp bootcamp distributed web scraper. Requirements are in `PHASE1_TASKS.md`. Progress is in `TASK_TRACKER.md`.
+A distributed, fault-tolerant web crawler for the onRamp bootcamp. Phase 1 crawls three websites on one theme, then cleans, versions and serves the pages through an authenticated API and a web UI.
 
-## Language
+## Documents
 
-Python 3.12.
+- [docs/phase1/SPEC.md](docs/phase1/SPEC.md) — Phase 1 requirements, restated from the assignment
+- [docs/phase1/TRACKER.md](docs/phase1/TRACKER.md) — ordered tasks and status
+- [docs/DECISIONS.md](docs/DECISIONS.md) — chosen stack, each with the alternative we rejected
 
-Python fits this phase better than Node.js. The graded work is fetching, parsing, cleaning, and validating HTML with ordinary libraries, and rendering in a browser only for the JavaScript site. Node.js with a queue such as BullMQ is a reasonable alternative for the worker side, but the parse-and-validate path is more direct in Python, and the workers are still separate containers either way.
+## Stack
 
-## Layout
-
-- `src/onramp_scraper/` — application package
-- `.env.example` — settings with no secrets
-- `PHASE1_TASKS.md` — assignment spec
-- `TASK_TRACKER.md` — categorized task status
+Python 3.12 · Celery on RabbitMQ · Redis · PostgreSQL 16 · FastAPI · Playwright · BeautifulSoup · React + Vite · Docker Compose · GitHub Actions.
 
 ## Setup
 
 Copy `.env.example` to `.env` and set a real contact address in `USER_AGENT` before any crawl.
 
-The stack does not start yet. Container startup is task E2.
+The stack does not start yet. Container startup is task E1.

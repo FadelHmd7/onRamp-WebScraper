@@ -9,3 +9,7 @@ __pycache__/
 dist/
 build/
 *.egg-info/
+
+# Course handout, kept out of the repository
+*.pdf
+!docs/**/*.pdf

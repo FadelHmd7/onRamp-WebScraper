@@ -1,6 +1,6 @@
 # Phase 1 — Distributed Web Scraper
 
-Source: *Distributed Web Scraper — Phase 1: Crawling, Queuing & Distributed Workers* (Nov 22, 2026, @Most).
+Source: *Distributed Web Scraper — Phase 1: Crawling, Queuing & Distributed Workers* (Nov 22, 2026, @Most). This file restates the PDF; nothing here is added except the last two sections.
 
 Phase 1 is a distributed, fault-tolerant web crawler that extracts, cleans, versions, and serves data from three websites through an authenticated API and a basic web UI. Phase 2 builds on this codebase and this data, so keep each page’s structure (headings, tables, links, versions) instead of flattening a page into one text blob.
 
@@ -257,31 +257,20 @@ Show:
 
 Workers that are only processes on one machine cap the distributed-workers area at 10/25.
 
-## Suggested build order
+## Requirements the PDF implies but does not list
 
-1. Repo, `.env.example`, compose skeleton, CI, and fixture-based unit tests.
-2. URL normalization, robots checks, shared seen-set, and per-domain rate limiter.
-3. HTTP fetcher, then headless fetcher behind per-site config.
-4. Queue, stateless worker container, idempotent page writes, retries, dead-letter queue.
-5. Cleaning, schema validation, content blocks, links, and one extra content type.
-6. Versioning and incremental re-crawl, including a local mutable fixture server.
-7. API with auth, OpenAPI, and full-text search.
-8. UI: login, dashboard, search, document page.
-9. Failure demos, 1/2/4 worker benchmark, sample export, report, and video.
+These follow from the rules above. The tracker covers each one.
 
-## Suggested stack notes (not required)
+- **Local test server.** The failure scenarios, the versioning demo and the 1/2/4-worker benchmark all need pages we control: slow responses, 429 with `Retry-After`, URLs that always fail, pages we can edit between crawls, and 500+ paginated pages.
+- **Crawl records.** `POST /crawls` (full or incremental) and `GET /crawls/:id` (progress and errors) need a crawl entity with counters.
+- **Removal detection.** "Pages that disappear are marked removed" needs a rule: a page that returns 404/410, or that a full crawl no longer reaches, gets `status = removed`.
+- **Worker liveness.** `/health` reports active workers, so workers publish a heartbeat.
+- **Users.** Two roles need stored users, hashed passwords and a seeded admin and viewer from environment variables.
+- **One worker = one fetch at a time.** Threads or processes inside one container do not count, so each worker container runs one task at a time. Scaling then means more containers.
+- **Sample export.** A script that writes at least 100 cleaned documents per site, including one with several versions.
+- **Diagrams.** Architecture, URL lifecycle with retries, and a crash-recovery sequence diagram for the report.
 
-Pick and justify one option in each row. Name the rejected alternative in the report.
+## Where the plan lives
 
-| Concern | Examples |
-| --- | --- |
-| Language | TypeScript/Node, Python, Go |
-| Queue | BullMQ, RabbitMQ, Celery |
-| Shared rate limit and seen-set | Redis |
-| Primary store | PostgreSQL |
-| Full-text search | Postgres `tsvector`, Elasticsearch, Meilisearch, Typesense |
-| JS rendering | Playwright, used only for site B (and site C if it needs it) |
-| HTML parse | Cheerio, BeautifulSoup — not regex |
-| Schema | Zod, Pydantic, or database constraints |
-| API docs | OpenAPI / Swagger |
-| Containers | One service per container; workers scaled with Compose |
+- `docs/DECISIONS.md` — chosen stack, each with the rejected alternative.
+- `docs/phase1/TRACKER.md` — ordered tasks, each with a "done when" check.
