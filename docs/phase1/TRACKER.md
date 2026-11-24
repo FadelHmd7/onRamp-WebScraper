@@ -13,8 +13,8 @@ Spec: `docs/phase1/SPEC.md`. Stack: `docs/DECISIONS.md`.
 
 | | |
 | --- | --- |
-| Current | **S1** — URL normalization (waiting for your commit) |
-| Next | **S2** — robots.txt checker |
+| Current | **S2** — robots.txt checker (waiting for your commit) |
+| Next | **S3** — Shared per-domain rate limiter |
 
 Status values: `todo`, `doing`, `done`.
 
@@ -50,8 +50,8 @@ After F3: push `main`, then create and push `phase-1`.
 
 | ID | Task | Done when | Status |
 | --- | --- | --- | --- |
-| S1 | URL normalization: scheme and host case, default ports, fragments, dot segments, sorted query, tracking parameters removed | **Required test area 1** passes (42 tests, including every link in saved pages) | doing |
-| S2 | robots.txt checker (protego), cached in Redis per host, honours our User-Agent | **Required test area 2** passes against saved robots files | todo |
+| S1 | URL normalization: scheme and host case, default ports, fragments, dot segments, sorted query, tracking parameters removed | **Required test area 1** passes (42 tests, including every link in saved pages) | done |
+| S2 | robots.txt checker (protego), cached in Redis per host, honours our User-Agent | **Required test area 2** passes against saved robots files (27 unit tests + 1 real-Redis test in CI) | doing |
 | S3 | Shared per-domain token bucket (Redis Lua script) | Test: 8 concurrent clients at 1 req/s get ≈1 req/s in total | todo |
 | S4 | HTTP fetcher (httpx): timeouts, descriptive User-Agent, conditional `ETag` / `If-Modified-Since`, error classes (retryable vs permanent), `Retry-After` parsing | Unit tests with mocked transport | todo |
 | S5 | Browser fetcher (Playwright), selected per site by `fetch_mode` in config, started only when needed | Site B fixture renders and static sites never start a browser | todo |

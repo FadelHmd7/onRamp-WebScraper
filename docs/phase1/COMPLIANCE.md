@@ -41,8 +41,8 @@ How the crawler follows each site's `robots.txt`, terms of service and rate limi
 | | |
 | --- | --- |
 | Purpose | Volunteer project publishing public-domain ebooks. |
-| robots.txt | For all agents: `Disallow: /honeypot`, `/ebooks/*/downloads/*`, `/ebooks/*/text*`. Named SEO and AI crawlers are blocked entirely; we are neither. No crawl delay. |
-| What we crawl | Catalog listing pages (`/ebooks?page=N`) and book pages (`/ebooks/<author>/<title>`). Downloads, full texts and the honeypot are excluded in our config as well. |
+| robots.txt | For `User-agent: *` (which covers us): `Disallow: /honeypot`. A separate group for named SEO and AI bots (AhrefsBot, claude-user and others) also disallows `/ebooks/*/downloads/*` and `/ebooks/*/text*`; we are not in that group, which the robots tests confirm. No crawl delay. |
+| What we crawl | Catalog listing pages (`/ebooks?page=N`) and book pages (`/ebooks/<author>/<title>`). Downloads and full texts are excluded in our config by choice (large files, not pages worth indexing), and the honeypot because robots.txt disallows it. |
 | Terms | Their own work is dedicated to the public domain (CC0 1.0), and the texts are U.S. public domain ("About" page). No terms restrict crawling. |
 | Our rate | 1 request per second, shared by all workers. Conservative because it is a small volunteer project. |
 | Crawl scope | 129 listing pages plus book pages. At most 700 pages, about 12 minutes. |

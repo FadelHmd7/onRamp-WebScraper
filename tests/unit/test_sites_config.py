@@ -52,7 +52,7 @@ def test_inventaire_respects_crawl_delay(sites: dict[str, Any]) -> None:
         (
             "standard-ebooks",
             "https://standardebooks.org/ebooks/jane-austen/emma/downloads/cover.jpg",
-            False,  # robots
+            False,  # our choice: files, not pages
         ),
         ("standard-ebooks", "https://standardebooks.org/ebooks/jane-austen/emma/text", False),
         ("testsite", "http://testsite:8000/items/42", True),
