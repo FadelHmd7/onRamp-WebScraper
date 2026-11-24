@@ -9,6 +9,7 @@ A distributed, fault-tolerant web crawler for the onRamp bootcamp. Phase 1 crawl
 - [docs/phase1/SPEC.md](docs/phase1/SPEC.md) — Phase 1 requirements, restated from the assignment
 - [docs/phase1/TRACKER.md](docs/phase1/TRACKER.md) — ordered tasks and status
 - [docs/DECISIONS.md](docs/DECISIONS.md) — chosen stack, each with the alternative we rejected
+- [docs/phase1/SITES.md](docs/phase1/SITES.md) — theme, the three sites, and the candidates we rejected
 
 ## Stack
 

@@ -13,8 +13,8 @@ Spec: `docs/phase1/SPEC.md`. Stack: `docs/DECISIONS.md`.
 
 | | |
 | --- | --- |
-| Current | **E3** — `testsite` container (waiting for your commit) |
-| Next | **P1** — Pick the theme and three sites |
+| Current | **P1** — Theme and three sites (waiting for your approval and commit) |
+| Next | **P2** — Compliance record and `config/sites.yaml` |
 
 Status values: `todo`, `doing`, `done`.
 
@@ -36,13 +36,13 @@ After F3: push `main`, then create and push `phase-1`.
 | --- | --- | --- | --- |
 | E1 | `docker-compose.yml`: postgres, redis, rabbitmq, api stub, worker stub, ui placeholder. Healthchecks, settings from `.env`, no fixed name or port on `worker` | `docker compose up` is healthy and `docker compose up --scale worker=4` shows 4 workers. Verified: 4 consumers, 8 jobs split 2 per worker | done |
 | E2 | GitHub Actions on every push: ruff, pytest (with Redis and Postgres services), build of every image | CI is green on `phase-1` | done |
-| E3 | `testsite` container: 600 paginated pages, `/slow`, `/flaky`, `/429` with `Retry-After`, `/always-500`, editable pages for versioning, its own `robots.txt` | `curl` reaches each behaviour from inside the compose network | doing |
+| E3 | `testsite` container: 600 paginated pages, `/slow`, `/flaky`, `/429` with `Retry-After`, `/always-500`, editable pages for versioning, its own `robots.txt` | `curl` reaches each behaviour from inside the compose network | done |
 
 ## M2 — Sites and compliance
 
 | ID | Task | Done when | Status |
 | --- | --- | --- | --- |
-| P1 | Pick one theme and three sites: A static, B JavaScript-rendered, C 500+ pages with pagination. At most one sandbox site | You approve the three sites | todo |
+| P1 | Pick one theme and three sites: A static, B JavaScript-rendered, C 500+ pages with pagination. At most one sandbox site | You approve the three sites in `docs/phase1/SITES.md` | doing |
 | P2 | `docs/phase1/COMPLIANCE.md` (robots rules, terms, rate limit per site) and `config/sites.yaml` (seeds, allowed hosts, fetch mode, depth, page limit, rate, selectors) | Every site has a filled row and a config entry | todo |
 | P3 | Save a few HTML pages per site into `tests/fixtures/` (fetched once, politely) | Fixtures committed with their source URL and date | todo |
 
