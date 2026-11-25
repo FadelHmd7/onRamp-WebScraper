@@ -1,5 +1,6 @@
 """Cleaned documents: a page's current version, filterable and paginated."""
 
+import uuid
 from datetime import datetime
 from typing import Annotated, Any, Literal
 
@@ -9,6 +10,7 @@ from pydantic import BaseModel, Field
 from onramp_scraper.api.deps import CurrentUser, SessionDep
 from onramp_scraper.api.schemas import Page
 from onramp_scraper.storage import documents as store
+from onramp_scraper.storage.models import DocumentVersion
 
 router = APIRouter(prefix="/documents", tags=["documents"])
 
@@ -108,4 +110,67 @@ def get_document(document_id: int, _: CurrentUser, session: SessionDep) -> Docum
         fields=row.version.fields,
         links=links,
         raw=f"/pages/{row.page.id}/raw",
+    )
+
+
+class VersionSummary(BaseModel):
+    version: int
+    crawled_at: datetime = Field(description="When this version was stored")
+    content_hash: str = Field(description="SHA-256 of title, blocks and fields")
+    title: str
+    crawl_id: uuid.UUID | None = Field(description="The crawl that found this version")
+    current: bool
+
+
+class Version(VersionSummary):
+    blocks: list[dict[str, Any]]
+    fields: dict[str, Any]
+
+
+class VersionHistory(BaseModel):
+    id: int
+    url: str
+    current_version: int
+    status: Literal["active", "removed"]
+    versions: list[VersionSummary] = Field(description="Newest first")
+
+
+def _version_summary(row: DocumentVersion, current: int) -> VersionSummary:
+    return VersionSummary(
+        version=row.version,
+        crawled_at=row.crawled_at,
+        content_hash=row.content_hash,
+        title=row.title,
+        crawl_id=row.crawl_id,
+        current=row.version == current,
+    )
+
+
+@router.get("/{document_id}/versions", response_model=VersionHistory)
+def list_versions(document_id: int, _: CurrentUser, session: SessionDep) -> VersionHistory:
+    """Every stored version of a document, newest first. Old versions are never changed."""
+    row = store.get_document(session, document_id)
+    if row is None:
+        raise HTTPException(status_code=404, detail="No such document")
+    current = row.version.version
+    return VersionHistory(
+        id=row.page.id,
+        url=row.page.url,
+        current_version=current,
+        status=row.page.status,  # type: ignore[arg-type]  # checked by a database constraint
+        versions=[_version_summary(v, current) for v in store.list_versions(session, row.page.id)],
+    )
+
+
+@router.get("/{document_id}/versions/{version}", response_model=Version)
+def get_version(document_id: int, version: int, _: CurrentUser, session: SessionDep) -> Version:
+    """One version in full, for example to compare it with the current one."""
+    row = store.get_document(session, document_id)
+    found = store.get_version(session, document_id, version) if row else None
+    if row is None or found is None:
+        raise HTTPException(status_code=404, detail="No such version")
+    return Version(
+        **_version_summary(found, row.version.version).model_dump(),
+        blocks=found.blocks,
+        fields=found.fields,
     )

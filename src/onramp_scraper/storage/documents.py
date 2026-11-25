@@ -112,3 +112,22 @@ def fetch_history(session: Session, page_id: int, limit: int = 20) -> list[Fetch
         .limit(limit)
     )
     return [FetchSummary(*row) for row in rows]
+
+
+def list_versions(session: Session, page_id: int) -> list[DocumentVersion]:
+    """Every version of a page, newest first (blocks are loaded only when asked for)."""
+    return list(
+        session.scalars(
+            select(DocumentVersion)
+            .where(DocumentVersion.page_id == page_id)
+            .order_by(DocumentVersion.version.desc())
+        )
+    )
+
+
+def get_version(session: Session, page_id: int, version: int) -> DocumentVersion | None:
+    return session.scalars(
+        select(DocumentVersion).where(
+            DocumentVersion.page_id == page_id, DocumentVersion.version == version
+        )
+    ).one_or_none()
