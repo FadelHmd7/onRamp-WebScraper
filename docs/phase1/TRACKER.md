@@ -13,8 +13,8 @@ Spec: `docs/phase1/SPEC.md`. Stack: `docs/DECISIONS.md`.
 
 | | |
 | --- | --- |
-| Current | **A7** — Health |
-| Next | **A8** — Role-matrix tests |
+| Current | **A8** — Role-matrix tests |
+| Next | M7 — Web UI (**U1**) |
 
 Status values: `todo`, `doing`, `done`.
 
@@ -92,7 +92,7 @@ After F3: push `main`, then create and push `phase-1`.
 | A4 | `GET /documents/{id}/versions` | Lists every version with its time and hash. Newest first with the crawl that found it; `/documents/{id}/versions/{n}` returns an old version in full | done |
 | A5 | `GET /search?q=&site=` using the GIN index, with `ts_headline` snippets | `EXPLAIN` shows the index; snippets have highlights. On the compose data a selective term uses `Bitmap Index Scan on ix_document_versions_search` unforced (a term on every page gets a cheaper seq scan); snippets are escaped with `<mark>` highlights; current versions of active pages only; `"phrase"`, `-word`, `or` supported | done |
 | A6 | `GET /dlq`, `POST /dlq/{id}/retry` | Retried job runs again and leaves the queue on success (status `resolved`); one that fails again returns to `dead`; a second retry of the same entry gets 409, so a double click sends it once | done |
-| A7 | Public `GET /health`: database, Redis and RabbitMQ status, queue length, active workers | Works without a token | todo |
+| A7 | Public `GET /health`: database, Redis and RabbitMQ status, queue length, active workers | Works without a token. Reports each dependency (ok, ms, error), queue ready/unacked/consumers, active and busy workers from heartbeats, running crawls; 503 `degraded` when PostgreSQL, Redis or RabbitMQ is down (each tested) | done |
 | A8 | Role-matrix tests: every endpoint × no token / viewer / admin | All pass in CI | todo |
 
 ## M7 — Web UI (Task 6, 5 pts)

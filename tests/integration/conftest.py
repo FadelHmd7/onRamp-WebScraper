@@ -23,6 +23,8 @@ from sqlalchemy.orm import Session, sessionmaker
 
 from onramp_scraper.api.app import create_app
 from onramp_scraper.api.deps import get_sessions
+from onramp_scraper.api.routes.health import get_queue_probe
+from onramp_scraper.queue_stats import QueueDepth
 from onramp_scraper.storage.db import sqlalchemy_url
 from onramp_scraper.storage.migrate import alembic_config, sync_sites
 from onramp_scraper.storage.users import SeedUser, seed_users
@@ -113,6 +115,8 @@ def api(sessions: sessionmaker[Session]) -> Iterator[TestClient]:
         )
     app = create_app()
     app.dependency_overrides[get_sessions] = lambda: sessions
+    # No RabbitMQ management API in tests: an empty queue (test_api_health swaps it).
+    app.dependency_overrides[get_queue_probe] = lambda: lambda: QueueDepth(0, 0, 0)
     with TestClient(app) as client:
         yield client
 
