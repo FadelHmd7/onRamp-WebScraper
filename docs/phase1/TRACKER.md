@@ -13,8 +13,8 @@ Spec: `docs/phase1/SPEC.md`. Stack: `docs/DECISIONS.md`.
 
 | | |
 | --- | --- |
-| Current | **A6** — Dead-letter endpoints |
-| Next | **A7** — Health |
+| Current | **A7** — Health |
+| Next | **A8** — Role-matrix tests |
 
 Status values: `todo`, `doing`, `done`.
 
@@ -91,7 +91,7 @@ After F3: push `main`, then create and push `phase-1`.
 | A3 | `GET /pages/{id}/raw`, `GET /documents` (site, status and date filters, pagination), `GET /documents/{id}` | Paginated results with totals. Filters by site, status (active/removed) and change time; a document has its blocks (tables included), fields and outbound links; raw HTML comes as JSON, never served as a page (it would run the site's scripts on our origin) | done |
 | A4 | `GET /documents/{id}/versions` | Lists every version with its time and hash. Newest first with the crawl that found it; `/documents/{id}/versions/{n}` returns an old version in full | done |
 | A5 | `GET /search?q=&site=` using the GIN index, with `ts_headline` snippets | `EXPLAIN` shows the index; snippets have highlights. On the compose data a selective term uses `Bitmap Index Scan on ix_document_versions_search` unforced (a term on every page gets a cheaper seq scan); snippets are escaped with `<mark>` highlights; current versions of active pages only; `"phrase"`, `-word`, `or` supported | done |
-| A6 | `GET /dlq`, `POST /dlq/{id}/retry` | Retried job runs again and leaves the queue on success | todo |
+| A6 | `GET /dlq`, `POST /dlq/{id}/retry` | Retried job runs again and leaves the queue on success (status `resolved`); one that fails again returns to `dead`; a second retry of the same entry gets 409, so a double click sends it once | done |
 | A7 | Public `GET /health`: database, Redis and RabbitMQ status, queue length, active workers | Works without a token | todo |
 | A8 | Role-matrix tests: every endpoint × no token / viewer / admin | All pass in CI | todo |
 
