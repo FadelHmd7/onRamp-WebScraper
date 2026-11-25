@@ -13,8 +13,8 @@ Spec: `docs/phase1/SPEC.md`. Stack: `docs/DECISIONS.md`.
 
 | | |
 | --- | --- |
-| Current | **S5** — Browser fetcher (waiting for your commit and green CI) |
-| Next | **S6** — Frontier: link extraction, crawl limits, shared seen-set |
+| Current | **S6** — Frontier (waiting for your commit) |
+| Next | **D1** — Data model and migrations |
 
 Status values: `todo`, `doing`, `done`.
 
@@ -55,7 +55,7 @@ After F3: push `main`, then create and push `phase-1`.
 | S3 | Shared per-domain token bucket (Redis Lua script) | Test: 8 concurrent clients at 1 req/s get ≈1 req/s in total. Measured on real Redis 7: 8 workers at 4 req/s → 4.00 req/s | done |
 | S4 | HTTP fetcher (httpx): timeouts, descriptive User-Agent, conditional `ETag` / `If-Modified-Since`, error classes (retryable vs permanent), `Retry-After` parsing | Unit tests with mocked transport (37), including robots-blocked URLs never requested and 429 pausing the whole host | done |
 | S5 | Browser fetcher (Playwright), selected per site by `fetch_mode` in config, started only when needed | Real Chromium renders the test site's JavaScript page that plain HTTP cannot see; static sites never start a browser; worker image launches Chromium (verified by CI's build job) | done |
-| S6 | Frontier: link extraction with the parser, allowed-host, depth and page-count limits, shared seen-set in Redis | Tests for each limit, and seen-set shared across two clients | todo |
+| S6 | Frontier: link extraction with the parser, allowed-host, depth and page-count limits, shared seen-set in Redis | Tests for each limit; 8 racing workers take each URL once and the page budget holds exactly (fakeredis + real Redis in CI) | doing |
 
 ## M4 — Processing and storage (Task 4, 15 pts)
 

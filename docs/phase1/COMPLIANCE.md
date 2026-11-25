@@ -9,6 +9,7 @@ How the crawler follows each site's `robots.txt`, terms of service and rate limi
 - **One shared rate limit per host**, enforced across all workers through Redis (task S3). Adding workers never raises the request rate to a site.
 - **Backoff on 429 and 503**, honouring `Retry-After` (task W3).
 - **No logins, paywalls or CAPTCHAs, and no bot-detection bypass.** A 401 or 403 response, or a CAPTCHA page, is treated as a permanent failure: the URL is not retried.
+- **Page-level `nofollow`** (`<meta name="robots" content="nofollow">`) and link-level `rel="nofollow"` are honoured: such links are stored but never crawled. On Standard Ebooks this is what keeps us off the hidden honeypot link.
 - **Conditional requests** (`If-None-Match`, `If-Modified-Since`) on re-crawls where a site supports them, so unchanged pages cost the site a 304 instead of a full page.
 
 ## Per site
@@ -20,6 +21,7 @@ How the crawler follows each site's `robots.txt`, terms of service and rate limi
 | Purpose | Scraping sandbox: "We love being scraped!" on the home page. Our one permitted sandbox. |
 | robots.txt | Returns 404, so nothing is disallowed. |
 | Terms | No terms page. The site warns that prices and ratings are random, so we never present them as real. |
+| Meta robots | Pages carry `<meta name="robots" content="NOARCHIVE,NOCACHE">`, which asks search engines not to show a public cached copy. We store raw HTML because the spec requires it, and serve it only to logged-in users of our own system, never publicly. |
 | Our rate | 2 requests per second, shared by all workers. |
 | Crawl scope | Home, 50 listing pages, book pages. At most 300 pages. |
 | Change detection | The site sends `ETag` and `Last-Modified`, so re-crawls use conditional requests. |
