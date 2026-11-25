@@ -25,6 +25,7 @@ from typing import Any
 from bs4 import BeautifulSoup, Tag
 from bs4.element import Comment, NavigableString
 
+from onramp_scraper.parsing import parse_html
 from onramp_scraper.processing.tables import is_layout_table, parse_table
 from onramp_scraper.processing.text import collapse
 
@@ -228,7 +229,7 @@ def block_text(block: Block) -> str:
 def clean_html(
     html: str, title_selector: str | None = None, remove: list[str] | None = None
 ) -> CleanedPage:
-    soup = BeautifulSoup(html, "lxml")
+    soup = parse_html(html)
     original_title = collapse(soup.title.get_text(" ")) if soup.title else ""
     # Title first: a site's title element may sit in a region that cleaning drops.
     custom_title = soup.select_one(title_selector) if title_selector else None

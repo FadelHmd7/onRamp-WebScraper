@@ -24,6 +24,12 @@ class FieldRule(BaseModel):
     - ``key`` + ``value``: every match becomes one pair, read from these two
       sub-selectors, and the field is a dictionary (for example an infobox
       of "First publication date: 1813" rows).
+    - ``pattern``: a regex applied to the text; its first group (or the whole
+      match) is kept, for example ``"\\((\\d+) available\\)"``.
+    - ``type``: ``int`` or ``float``, for single values only. Lists and pairs
+      stay text.
+
+    Extraction itself is in ``processing/fields.py``.
     """
 
     model_config = ConfigDict(extra="forbid")
@@ -33,6 +39,21 @@ class FieldRule(BaseModel):
     many: bool = False
     key: str | None = None
     value: str | None = None
+    pattern: str | None = None
+    type: Literal["text", "int", "float"] = "text"
+
+    @field_validator("pattern")
+    @classmethod
+    def pattern_compiles(cls, pattern: str | None) -> str | None:
+        if pattern is None:
+            return None
+        try:
+            groups = re.compile(pattern).groups
+        except re.error as exc:
+            raise ValueError(f"invalid regex {pattern!r}: {exc}") from exc
+        if groups > 1:
+            raise ValueError(f"pattern {pattern!r} has {groups} groups; use at most one")
+        return pattern
 
     @model_validator(mode="after")
     def check_mode(self) -> Self:
@@ -40,6 +61,8 @@ class FieldRule(BaseModel):
             raise ValueError("key and value must be given together")
         if self.key is not None and (self.attr is not None or self.many):
             raise ValueError("key/value pairs cannot be combined with attr or many")
+        if self.type != "text" and (self.many or self.key is not None):
+            raise ValueError("type applies to single values; lists and pairs stay text")
         return self
 
 

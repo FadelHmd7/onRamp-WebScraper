@@ -21,6 +21,7 @@ from bs4 import BeautifulSoup, Tag
 from redis import Redis
 
 from onramp_scraper.crawler.urls import normalize_url
+from onramp_scraper.parsing import parse_html
 from onramp_scraper.sites import SiteConfig
 
 STATE_TTL = 7 * 24 * 3600  # crawl state expires a week after its last change
@@ -79,7 +80,7 @@ def page_nofollow(soup: BeautifulSoup) -> bool:
 
 def extract_links(html: str | BeautifulSoup, page_url: str) -> list[Link]:
     """Every crawlable link on the page, in document order, without duplicates."""
-    soup = html if isinstance(html, BeautifulSoup) else BeautifulSoup(html, "lxml")
+    soup = html if isinstance(html, BeautifulSoup) else parse_html(html)
     base = page_url
     base_tag = soup.select_one("base[href]")
     if base_tag is not None:
