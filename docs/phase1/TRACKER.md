@@ -13,8 +13,8 @@ Spec: `docs/phase1/SPEC.md`. Stack: `docs/DECISIONS.md`.
 
 | | |
 | --- | --- |
-| Current | **A8** — Role-matrix tests |
-| Next | M7 — Web UI (**U1**) |
+| Current | M6 done; **U1** next (waiting for your go-ahead) |
+| Next | M7 — Web UI: U1 to U5 |
 
 Status values: `todo`, `doing`, `done`.
 
@@ -93,7 +93,7 @@ After F3: push `main`, then create and push `phase-1`.
 | A5 | `GET /search?q=&site=` using the GIN index, with `ts_headline` snippets | `EXPLAIN` shows the index; snippets have highlights. On the compose data a selective term uses `Bitmap Index Scan on ix_document_versions_search` unforced (a term on every page gets a cheaper seq scan); snippets are escaped with `<mark>` highlights; current versions of active pages only; `"phrase"`, `-word`, `or` supported | done |
 | A6 | `GET /dlq`, `POST /dlq/{id}/retry` | Retried job runs again and leaves the queue on success (status `resolved`); one that fails again returns to `dead`; a second retry of the same entry gets 409, so a double click sends it once | done |
 | A7 | Public `GET /health`: database, Redis and RabbitMQ status, queue length, active workers | Works without a token. Reports each dependency (ok, ms, error), queue ready/unacked/consumers, active and busy workers from heartbeats, running crawls; 503 `degraded` when PostgreSQL, Redis or RabbitMQ is down (each tested) | done |
-| A8 | Role-matrix tests: every endpoint × no token / viewer / admin | All pass in CI | todo |
+| A8 | Role-matrix tests: every endpoint × no token / viewer / admin | All pass in CI. The matrix is built from the app's own OpenAPI operations, so a new route not in the table fails; removing auth from one route on purpose failed 2 tests | done |
 
 ## M7 — Web UI (Task 6, 5 pts)
 
