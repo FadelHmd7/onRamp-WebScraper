@@ -24,6 +24,7 @@ MATRIX: dict[tuple[str, str], Access] = {
     ("GET", "/health"): "public",
     ("POST", "/auth/token"): "public",
     ("GET", "/auth/me"): "viewer",
+    ("GET", "/sites"): "viewer",
     ("POST", "/crawls"): "admin",
     ("GET", "/crawls"): "viewer",
     ("GET", "/crawls/{crawl_id}"): "viewer",

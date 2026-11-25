@@ -10,7 +10,7 @@ else needs a bearer token; admin-only routes answer 403 to a viewer.
 from fastapi import FastAPI
 
 from onramp_scraper import __version__
-from onramp_scraper.api.routes import auth, crawls, dlq, documents, health, pages, search
+from onramp_scraper.api.routes import auth, crawls, dlq, documents, health, pages, search, sites
 
 DESCRIPTION = """
 Distributed web scraper, Phase 1. Log in with **Authorize** (the seeded
@@ -30,6 +30,7 @@ def create_app() -> FastAPI:
         description=DESCRIPTION,
         openapi_tags=[
             {"name": "auth", "description": "Log in and see who you are."},
+            {"name": "sites", "description": "The configured sites."},
             {"name": "crawls", "description": "Start crawls (admin) and follow their progress."},
             {"name": "documents", "description": "Cleaned documents and their versions."},
             {"name": "pages", "description": "Raw HTML and fetch details."},
@@ -43,6 +44,7 @@ def create_app() -> FastAPI:
     )
     app.include_router(health.router)
     app.include_router(auth.router)
+    app.include_router(sites.router)
     app.include_router(crawls.router)
     app.include_router(documents.router)
     app.include_router(pages.router)

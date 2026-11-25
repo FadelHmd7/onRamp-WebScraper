@@ -143,3 +143,11 @@ def test_unknown_crawl_is_404(api: TestClient) -> None:
         api.get("/crawls/00000000-0000-0000-0000-000000000000", headers=viewer).status_code == 404
     )
     assert api.get("/crawls/not-a-uuid", headers=viewer).status_code == 422
+
+
+def test_sites_lists_the_configuration(api: TestClient) -> None:
+    sites = api.get("/sites", headers=login(api, VIEWER)).json()
+    by_key = {s["key"]: s for s in sites}
+    assert set(by_key) == {"books-toscrape", "inventaire", "standard-ebooks", "testsite"}
+    assert by_key["inventaire"]["fetch_mode"] == "browser"
+    assert by_key["inventaire"]["requests_per_second"] == 0.1

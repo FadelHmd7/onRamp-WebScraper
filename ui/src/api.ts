@@ -82,7 +82,10 @@ export interface Site {
   name: string;
   base_url: string;
   role: string;
-  fetch_mode: string;
+  fetch_mode: "http" | "browser";
+  requests_per_second: number;
+  max_pages: number;
+  max_depth: number;
 }
 
 export interface SearchHit {

@@ -2,6 +2,7 @@ import { NavLink, Route, Routes } from "react-router";
 
 import { AuthProvider, RequireAuth, useAuth } from "./auth";
 import { HealthBadge } from "./components/HealthBadge";
+import { Dashboard } from "./pages/Dashboard";
 import { Login } from "./pages/Login";
 
 export function App() {
@@ -44,20 +45,11 @@ function Shell() {
       </header>
       <main className="content">
         <Routes>
-          <Route path="/" element={<Home />} />
+          <Route path="/" element={<Dashboard />} />
           <Route path="*" element={<NotFound />} />
         </Routes>
       </main>
     </div>
-  );
-}
-
-function Home() {
-  return (
-    <section>
-      <h1>Dashboard</h1>
-      <p className="muted">Crawl progress, queue and workers arrive with the dashboard (U3).</p>
-    </section>
   );
 }
 
