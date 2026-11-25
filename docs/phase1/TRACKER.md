@@ -13,8 +13,8 @@ Spec: `docs/phase1/SPEC.md`. Stack: `docs/DECISIONS.md`.
 
 | | |
 | --- | --- |
-| Current | M5 done; **A1** next (waiting for your go-ahead) |
-| Next | M6 — API: A1 to A8 |
+| Current | **A2** — Crawl endpoints |
+| Next | **A3** — Pages and documents |
 
 Status values: `todo`, `doing`, `done`.
 
@@ -86,7 +86,7 @@ After F3: push `main`, then create and push `phase-1`.
 
 | ID | Task | Done when | Status |
 | --- | --- | --- | --- |
-| A1 | FastAPI app: login returns a JWT, `admin` / `viewer` role dependency, admin and viewer seeded from env, Swagger with "Authorize" | Swagger at `/docs`; wrong role gets 403, no token gets 401 | todo |
+| A1 | FastAPI app: login returns a JWT, `admin` / `viewer` role dependency, admin and viewer seeded from env, Swagger with "Authorize" | Swagger at `/docs`; wrong role gets 403, no token gets 401. Also: expired, forged and `alg: none` tokens refused; a deleted or demoted user loses access at once (role read from the database); the API refuses development secrets outside `APP_ENV=development` | done |
 | A2 | `POST /crawls` (full or incremental), `GET /crawls`, `GET /crawls/{id}` | Admin starts a crawl; viewer can read but not start | todo |
 | A3 | `GET /pages/{id}/raw`, `GET /documents` (site, status and date filters, pagination), `GET /documents/{id}` | Paginated results with totals | todo |
 | A4 | `GET /documents/{id}/versions` | Lists every version with its time and hash | todo |

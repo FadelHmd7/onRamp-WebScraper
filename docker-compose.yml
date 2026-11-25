@@ -23,6 +23,14 @@ x-app-env: &app-env
   HEARTBEAT_TTL: ${HEARTBEAT_TTL:-15}
   HEARTBEAT_INTERVAL: ${HEARTBEAT_INTERVAL:-5}
   RABBITMQ_API_URL: http://rabbitmq:15672
+  # API logins. The defaults are for local development; set real values in
+  # .env (with APP_ENV other than development the API refuses the defaults).
+  JWT_SECRET: ${JWT_SECRET:-dev-only-jwt-secret-not-for-production-use}
+  JWT_TTL_MINUTES: ${JWT_TTL_MINUTES:-60}
+  ADMIN_USERNAME: ${ADMIN_USERNAME:-admin}
+  ADMIN_PASSWORD: ${ADMIN_PASSWORD:-admin-dev-password}
+  VIEWER_USERNAME: ${VIEWER_USERNAME:-viewer}
+  VIEWER_PASSWORD: ${VIEWER_PASSWORD:-viewer-dev-password}
 
 x-backing-services: &backing-services
   postgres:

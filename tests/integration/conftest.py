@@ -14,14 +14,18 @@ import httpx
 import pytest
 import uvicorn
 from alembic import command
+from fastapi.testclient import TestClient
 from redis import Redis
 from redis.exceptions import RedisError
 from sqlalchemy import Engine, create_engine, text
 from sqlalchemy.exc import OperationalError
 from sqlalchemy.orm import Session, sessionmaker
 
+from onramp_scraper.api.app import create_app
+from onramp_scraper.api.deps import get_sessions
 from onramp_scraper.storage.db import sqlalchemy_url
 from onramp_scraper.storage.migrate import alembic_config, sync_sites
+from onramp_scraper.storage.users import SeedUser, seed_users
 from onramp_testsite import app as testsite
 
 # Everything that crawls write; sites and users are kept.
@@ -90,3 +94,31 @@ def redis_client() -> Iterator[Redis]:
         pytest.skip("Redis is not reachable")
     yield client
     client.close()
+
+
+# ---------------------------------------------------------------- the API
+
+ADMIN = ("ada", "admin-test-password")
+VIEWER = ("vic", "viewer-test-password")
+
+
+@pytest.fixture
+def api(sessions: sessionmaker[Session]) -> Iterator[TestClient]:
+    """The real API app on the test database, with one admin and one viewer."""
+    with sessions.begin() as session:
+        session.execute(text("DELETE FROM users"))
+        seed_users(
+            session,
+            [SeedUser(*ADMIN, role="admin"), SeedUser(*VIEWER, role="viewer")],
+        )
+    app = create_app()
+    app.dependency_overrides[get_sessions] = lambda: sessions
+    with TestClient(app) as client:
+        yield client
+
+
+def login(client: TestClient, user: tuple[str, str]) -> dict[str, str]:
+    """Headers with a bearer token for ``user``."""
+    response = client.post("/auth/token", data={"username": user[0], "password": user[1]})
+    assert response.status_code == 200, response.text
+    return {"Authorization": f"Bearer {response.json()['access_token']}"}

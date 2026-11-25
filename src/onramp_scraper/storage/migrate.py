@@ -17,11 +17,13 @@ from alembic.config import Config
 from sqlalchemy import Engine, create_engine, text
 from sqlalchemy.dialects.postgresql import insert
 from sqlalchemy.exc import OperationalError
+from sqlalchemy.orm import Session
 
 from onramp_scraper.config import get_settings
 from onramp_scraper.sites import load_sites
 from onramp_scraper.storage.db import sqlalchemy_url
 from onramp_scraper.storage.models import Site
+from onramp_scraper.storage.users import SeedUser, seed_users
 
 MIGRATIONS = Path(__file__).with_name("migrations")
 
@@ -68,6 +70,15 @@ def sync_sites(engine: Engine) -> int:
     return len(rows)
 
 
+def configured_users() -> list[SeedUser]:
+    """The admin and viewer from the environment (ADMIN_* and VIEWER_* variables)."""
+    settings = get_settings()
+    return [
+        SeedUser(settings.admin_username, settings.admin_password.get_secret_value(), "admin"),
+        SeedUser(settings.viewer_username, settings.viewer_password.get_secret_value(), "viewer"),
+    ]
+
+
 def main(argv: list[str]) -> int:
     config = alembic_config()
     url = config.get_main_option("sqlalchemy.url") or ""
@@ -80,6 +91,9 @@ def main(argv: list[str]) -> int:
     engine = create_engine(url)
     try:
         print(f"synced {sync_sites(engine)} sites from {get_settings().sites_file}")
+        with Session(engine) as session, session.begin():
+            for change in seed_users(session, configured_users()) or ["users up to date"]:
+                print(change)
     finally:
         engine.dispose()
     return 0
