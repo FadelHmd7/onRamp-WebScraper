@@ -25,7 +25,7 @@ from sqlalchemy import select, update
 from sqlalchemy.dialects.postgresql import insert
 from sqlalchemy.orm import Session
 
-from onramp_scraper.processing.changes import Decision, StoredPage, decide
+from onramp_scraper.processing.changes import Change, Decision, StoredPage, decide
 from onramp_scraper.processing.clean import CleanedPage
 from onramp_scraper.processing.document import build_document, content_hash
 from onramp_scraper.sites import SiteConfig
@@ -85,6 +85,26 @@ def _touch(page: Page, seen_at: datetime, etag: str | None, last_modified: str |
     page.last_modified = last_modified
 
 
+def _replayed(session: Session, page: Page, crawl_id: uuid.UUID | None) -> Saved | None:
+    """The same crawl already stored this content: a re-delivered job (task D7).
+
+    It reports what the first run did, with the same version row, so the
+    crawl's counts do not turn a new page into an "unchanged" one.
+    """
+    if crawl_id is None or page.current_version is None:
+        return None
+    current = session.scalars(
+        select(DocumentVersion).where(
+            DocumentVersion.page_id == page.id, DocumentVersion.version == page.current_version
+        )
+    ).one()
+    if current.crawl_id != crawl_id:
+        return None
+    change = Change.NEW if current.version == 1 else Change.CHANGED
+    decision = Decision(change, current.version, "already stored by this crawl")
+    return Saved(page.id, decision, current.id)
+
+
 def save_page(
     session: Session,
     *,
@@ -103,7 +123,7 @@ def save_page(
     decision = decide(stored_state(page), content_hash(cleaned.title, cleaned.blocks, fields))
     _touch(page, crawled_at, etag, last_modified)
     if not decision.is_new_version:
-        return Saved(page.id, decision, None)
+        return _replayed(session, page, crawl_id) or Saved(page.id, decision, None)
 
     document = build_document(
         cleaned, url=url, site=site, version=decision.version, crawled_at=crawled_at, fields=fields

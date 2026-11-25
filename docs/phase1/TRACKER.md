@@ -13,8 +13,8 @@ Spec: `docs/phase1/SPEC.md`. Stack: `docs/DECISIONS.md`.
 
 | | |
 | --- | --- |
-| Current | **D7** — Idempotent writes |
-| Next | **W1** — Celery crawl task |
+| Current | M4 done; **W1** next (waiting for your go-ahead) |
+| Next | **W1** — Celery crawl task, then W2–W8 |
 
 Status values: `todo`, `doing`, `done`.
 
@@ -67,7 +67,7 @@ After F3: push `main`, then create and push `phase-1`.
 | D4 | Pydantic document schema; invalid documents rejected with a logged reason | Tests for a valid document and each rejection reason | done |
 | D5 | Site-specific fields from selectors in `sites.yaml` (for example price, code) | Fixture tests per site | done |
 | D6 | Change detection: `304` / unchanged `ETag` / same content hash means no new version; a changed hash means version + 1 | **Required test area 3** passes (18 unit tests); on real Postgres, old versions are kept, removed pages keep their versions, and 8 concurrent workers never duplicate a version | done |
-| D7 | Idempotent writes for fetch, version and links (`ON CONFLICT`, unique keys) | Test: saving the same result twice leaves the same rows | todo |
+| D7 | Idempotent writes for fetch, version and links (`ON CONFLICT`, unique keys) | Test: saving the same result twice leaves the same rows (snapshot of every row in pages, fetches, versions and links), also with 6 concurrent deliveries of one job | done |
 
 ## M5 — Distributed workers and fault tolerance (Task 3, 25 pts)
 
