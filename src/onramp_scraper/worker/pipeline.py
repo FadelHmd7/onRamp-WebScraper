@@ -20,7 +20,7 @@ crash after step 3 loses nothing: the job is already complete.
 import logging
 import uuid
 from collections.abc import Callable
-from dataclasses import asdict, dataclass, field
+from dataclasses import asdict, dataclass, field, replace
 from typing import Any
 
 from sqlalchemy import select
@@ -33,9 +33,10 @@ from onramp_scraper.processing.clean import clean_html
 from onramp_scraper.processing.document import InvalidDocument
 from onramp_scraper.processing.fields import extract_fields
 from onramp_scraper.sites import SiteConfig
-from onramp_scraper.storage import crawls
+from onramp_scraper.storage import crawls, dead_letters
 from onramp_scraper.storage.models import Crawl
 from onramp_scraper.storage.writes import store_page
+from onramp_scraper.worker.retry import RetryPolicy
 
 log = logging.getLogger(__name__)
 
@@ -74,15 +75,28 @@ class CrawlContext:
     frontier: Frontier
     sites: dict[str, SiteConfig]
     enqueue: Enqueue
+    retry: RetryPolicy = field(default_factory=RetryPolicy)
 
 
 @dataclass
 class JobResult:
     """What one run did, for logs and tests."""
 
-    status: str  # the URL's final status, or "duplicate" / "cancelled"
+    status: str  # the URL's final status, or "retrying" / "duplicate" / "cancelled"
     reason: str = ""
     children: list[str] = field(default_factory=list)
+
+
+@dataclass(frozen=True)
+class Handled:
+    """A fetch's outcome: the URL's status, why, and the URLs it leads to."""
+
+    status: str
+    reason: str
+    candidates: list[str] = field(default_factory=list)  # in scope, in page order
+    child_depth: int = 0
+    retry_after: float | None = None  # seconds the server asked us to wait
+    http_status: int | None = None
 
 
 def _cancelled(session: Session, crawl_id: uuid.UUID) -> bool:
@@ -101,8 +115,15 @@ def process(job: Job, ctx: CrawlContext, redelivered: bool = False) -> JobResult
             # A duplicate message for a URL that is already done.
             return JobResult("duplicate", f"already {state.status}")
 
-    fetch = ctx.fetcher.fetch(job.url, site)
-    handled = _handle(job, site, fetch, ctx)
+    try:
+        fetch = ctx.fetcher.fetch(job.url, site)
+        handled = _handle(job, site, fetch, ctx)
+    except Exception as exc:  # a bug or a time limit: counts as a failed attempt
+        log.exception("job for %s raised", job.url)
+        handled = Handled("retry", f"{type(exc).__name__}: {exc}")
+    if handled.status == "retry":
+        return _retry_or_bury(job, handled, ctx)
+
     sent = _send_children(job, handled, ctx, redelivered)
     with ctx.sessions.begin() as session:
         crawls.record_queued(session, crawl_id, sent, handled.child_depth)
@@ -115,21 +136,70 @@ def process(job: Job, ctx: CrawlContext, redelivered: bool = False) -> JobResult
             attempts=job.attempt,
             error=handled.reason if handled.status in ("failed", "skipped") else None,
         )
-    with ctx.sessions.begin() as session:  # after the commit above, so it sees this URL done
-        if crawls.finish_if_done(session, crawl_id):
-            log.info("crawl %s finished", crawl_id)
+        dead_letters.resolve(session, crawl_id, job.url)  # if it was a dead-letter retry
+    _finish_if_done(ctx, crawl_id)
     log.info("%s %s (%s) +%d links", handled.status, job.url, handled.reason, len(sent))
     return JobResult(handled.status, handled.reason, sent)
 
 
-@dataclass(frozen=True)
-class Handled:
-    """A fetch's outcome: the URL's status, why, and the URLs it leads to."""
+def _finish_if_done(ctx: CrawlContext, crawl_id: uuid.UUID) -> None:
+    with ctx.sessions.begin() as session:  # a new transaction: it sees this job's commit
+        if crawls.finish_if_done(session, crawl_id):
+            log.info("crawl %s finished", crawl_id)
 
-    status: str
-    reason: str
-    candidates: list[str] = field(default_factory=list)  # in scope, in page order
-    child_depth: int = 0
+
+def _retry_or_bury(job: Job, handled: Handled, ctx: CrawlContext) -> JobResult:
+    """Send the job again after a backoff, or move it to the dead-letter queue.
+
+    The retry is sent before the row is updated: a crash in between leaves
+    the URL queued with a retry on its way, never queued with nothing coming.
+    """
+    crawl_id = uuid.UUID(job.crawl_id)
+    if ctx.retry.should_retry(job.attempt):
+        delay = ctx.retry.delay(job.attempt, handled.retry_after)
+        ctx.enqueue([replace(job, attempt=job.attempt + 1)], delay)
+        with ctx.sessions.begin() as session:
+            crawls.set_url_status(
+                session,
+                crawl_id,
+                job.url,
+                depth=job.depth,
+                status="queued",
+                attempts=job.attempt,
+                error=handled.reason,
+            )
+        log.warning(
+            "attempt %d for %s failed (%s); retry in %.1fs",
+            job.attempt,
+            job.url,
+            handled.reason,
+            delay,
+        )
+        return JobResult("retrying", f"{handled.reason}; retry in {delay:.1f}s")
+
+    with ctx.sessions.begin() as session:
+        dead_letters.bury(
+            session,
+            crawl_id=crawl_id,
+            site_key=job.site_key,
+            url=job.url,
+            depth=job.depth,
+            attempts=job.attempt,
+            error=handled.reason,
+            status_code=handled.http_status,
+        )
+        crawls.set_url_status(
+            session,
+            crawl_id,
+            job.url,
+            depth=job.depth,
+            status="dead",
+            attempts=job.attempt,
+            error=handled.reason,
+        )
+    _finish_if_done(ctx, crawl_id)
+    log.error("%s is dead after %d attempts: %s", job.url, job.attempt, handled.reason)
+    return JobResult("dead", handled.reason)
 
 
 def _handle(job: Job, site: SiteConfig, fetch: FetchResult, ctx: CrawlContext) -> Handled:
@@ -142,7 +212,10 @@ def _handle(job: Job, site: SiteConfig, fetch: FetchResult, ctx: CrawlContext) -
         return Handled("skipped", f"redirect to {target}", scoped, job.depth)
     if fetch.outcome is Outcome.BLOCKED:
         return Handled("skipped", fetch.error or "disallowed by robots.txt")
-    return Handled("failed", fetch.error or str(fetch.outcome))
+    if fetch.outcome is Outcome.RETRY:  # timeout, connection error, 429, 5xx
+        reason = fetch.error or "temporary failure"
+        return Handled("retry", reason, retry_after=fetch.retry_after, http_status=fetch.status)
+    return Handled("failed", fetch.error or str(fetch.outcome), http_status=fetch.status)
 
 
 def _store(job: Job, site: SiteConfig, fetch: FetchResult, ctx: CrawlContext) -> Handled:

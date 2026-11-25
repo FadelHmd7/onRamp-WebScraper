@@ -17,6 +17,8 @@ from functools import lru_cache
 from typing import Any
 
 from celery import Celery, Task
+from redis.exceptions import RedisError
+from sqlalchemy.exc import InterfaceError, OperationalError
 
 from onramp_scraper.config import get_settings
 from onramp_scraper.sites import load_sites
@@ -26,7 +28,8 @@ from onramp_scraper.worker.runtime import build_context
 
 CRAWL_QUEUE = "crawl"
 
-app = Celery("onramp_scraper", broker=get_settings().broker_url)
+settings = get_settings()
+app = Celery("onramp_scraper", broker=settings.broker_url)
 app.conf.update(
     task_default_queue=CRAWL_QUEUE,
     task_acks_late=True,
@@ -37,7 +40,16 @@ app.conf.update(
     task_serializer="json",
     accept_content=["json"],
     task_ignore_result=True,  # results live in PostgreSQL, not in a Celery backend
+    # A job that hangs is interrupted (counts as a failed attempt), then killed.
+    task_soft_time_limit=settings.task_soft_time_limit,
+    task_time_limit=settings.task_soft_time_limit + 30,
 )
+
+# Errors of our own infrastructure, not of the page: PostgreSQL or Redis is
+# briefly unreachable. The pipeline cannot even record an attempt, so Celery
+# publishes the job again later. Page errors never get here; the pipeline
+# retries those itself and moves them to the dead-letter queue.
+INFRASTRUCTURE_ERRORS = (OperationalError, InterfaceError, RedisError)
 
 
 def send_jobs(jobs: list[Job], delay: float = 0.0) -> None:
@@ -50,7 +62,6 @@ def context() -> CrawlContext:
     """Built on the first job, after Celery has forked the worker process."""
     from redis import Redis
 
-    settings = get_settings()
     return build_context(
         settings,
         load_sites(),
@@ -60,7 +71,15 @@ def context() -> CrawlContext:
     )
 
 
-@app.task(name="crawl.page", bind=True)
+@app.task(
+    name="crawl.page",
+    bind=True,
+    autoretry_for=INFRASTRUCTURE_ERRORS,
+    retry_backoff=5,
+    retry_backoff_max=300,
+    retry_jitter=True,
+    max_retries=12,
+)
 def crawl_page(self: Task[Any, Any], job: dict[str, Any]) -> dict[str, Any]:
     """Crawl one URL. RabbitMQ marks a message redelivered when its worker died."""
     redelivered = bool((self.request.delivery_info or {}).get("redelivered"))

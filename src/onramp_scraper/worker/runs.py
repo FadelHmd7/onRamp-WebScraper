@@ -9,7 +9,7 @@ import uuid
 
 from onramp_scraper.crawler.frontier import in_scope
 from onramp_scraper.crawler.urls import normalize_url
-from onramp_scraper.storage import crawls
+from onramp_scraper.storage import crawls, dead_letters
 from onramp_scraper.worker.pipeline import CrawlContext, Job
 
 MODES = ("full", "incremental")
@@ -45,3 +45,24 @@ def start_crawl(
         crawls.record_queued(session, crawl_id, accepted, 0)
     ctx.enqueue([Job(str(crawl_id), site_key, url, 0) for url in accepted], 0.0)
     return crawl_id
+
+
+def retry_dead_letter(ctx: CrawlContext, dead_letter_id: int) -> bool:
+    """Send a dead URL again (admin action). False if it is not in the dead-letter queue.
+
+    The row is committed as "retried" before the job is sent; otherwise a fast
+    worker could pick the job up, still see "dead", and drop it. If sending
+    fails, the row goes back to "dead" so the admin can try again.
+    """
+    with ctx.sessions.begin() as session:
+        row = dead_letters.take_for_retry(session, dead_letter_id)
+        if row is None:
+            return False
+        job = Job(str(row.crawl_id), row.site_key, row.url, row.depth)
+    try:
+        ctx.enqueue([job], 0.0)
+    except Exception:
+        with ctx.sessions.begin() as session:
+            dead_letters.put_back(session, dead_letter_id)
+        raise
+    return True

@@ -19,6 +19,7 @@ from onramp_scraper.crawler.ratelimit import RateLimiter
 from onramp_scraper.crawler.robots import RobotsChecker
 from onramp_scraper.sites import SiteConfig
 from onramp_scraper.worker.pipeline import CrawlContext, Enqueue
+from onramp_scraper.worker.retry import RetryPolicy
 
 
 def site_rate(sites: dict[str, SiteConfig], default: float) -> Callable[[str], float]:
@@ -51,4 +52,9 @@ def build_context(
         frontier=Frontier(redis),
         sites=sites,
         enqueue=enqueue,
+        retry=RetryPolicy(
+            max_attempts=settings.max_fetch_attempts,
+            base_delay=settings.retry_base_delay,
+            max_delay=settings.retry_max_delay,
+        ),
     )

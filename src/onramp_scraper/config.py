@@ -32,6 +32,11 @@ class Settings(BaseSettings):
     default_max_pages: int = Field(default=50, ge=1)
     requests_per_second: float = Field(default=1.0, gt=0)
     max_fetch_attempts: int = Field(default=5, ge=1)
+    # Retry backoff: attempt n waits up to base * 2**(n-1) seconds, at most max.
+    retry_base_delay: float = Field(default=2.0, ge=0)
+    retry_max_delay: float = Field(default=300.0, gt=0)
+    # A job running longer than this is stopped and counts as a failed attempt.
+    task_soft_time_limit: int = Field(default=120, ge=10)
 
 
 @lru_cache

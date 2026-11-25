@@ -138,6 +138,8 @@ sites:
       - ^/catalog\?page=\d+$
       - ^/items/\d+$
       - ^/editable(/[a-z0-9-]+)?$
+      # Failure modes for the demos (W3, W6); nothing links to them, demos seed them.
+      - ^/(slow|flaky|throttle|broken)/\d+(\?.*)?$
     exclude: []
     max_depth: 40
     max_pages: 700
