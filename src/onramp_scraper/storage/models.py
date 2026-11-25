@@ -85,6 +85,7 @@ class Crawl(Base):
     __table_args__ = (
         CheckConstraint(_one_of("mode", CRAWL_MODES), name="mode"),
         CheckConstraint(_one_of("status", CRAWL_STATUSES), name="status"),
+        CheckConstraint("max_depth >= 0", name="max_depth"),
         Index("ix_crawls_site_key_created_at", "site_key", "created_at"),
     )
 
@@ -99,6 +100,8 @@ class Crawl(Base):
     # NULL: the site's configured seeds. A list: custom seeds (a demo, a retry);
     # such a crawl never marks unreached pages as removed (migration 0002).
     seeds: Mapped[list[str] | None] = mapped_column(JSONB)
+    # NULL: the site's max_depth. Lower values crawl less deep (migration 0003).
+    max_depth: Mapped[int | None] = mapped_column(Integer)
 
 
 class CrawlUrl(Base):

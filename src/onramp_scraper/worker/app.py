@@ -8,6 +8,11 @@ The settings below are what make a killed worker safe:
   back to the queue instead of being marked failed.
 - ``worker_prefetch_multiplier = 1``: a worker holds one job at a time, so a
   crash loses at most that one job, and RabbitMQ redelivers it.
+- ``broker_heartbeat = 5``: RabbitMQ re-queues a dead worker's job as soon as
+  its TCP connection closes. A killed container does not always get to close
+  it (the network vanishes first); then only missed AMQP heartbeats reveal the
+  death. Celery's default of 120 s would leave the job stuck for minutes; at
+  5 s it is back in the queue within about 10-15 s.
 
 The crawl work itself is in ``worker/pipeline.py``; this module only adapts
 it to Celery.
@@ -43,6 +48,7 @@ app.conf.update(
     task_reject_on_worker_lost=True,
     worker_prefetch_multiplier=1,
     worker_concurrency=1,
+    broker_heartbeat=5,
     broker_connection_retry_on_startup=True,
     task_serializer="json",
     accept_content=["json"],

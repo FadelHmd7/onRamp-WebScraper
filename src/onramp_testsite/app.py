@@ -10,7 +10,7 @@ Normal pages
     /whoami                 echoes the User-Agent the crawler sent
 
 Failure modes (all counters are per id, reset with POST /_admin/reset)
-    /slow/{id}?delay=S              answers after S seconds (timeout demo)
+    /slow/{id}?delay=S[&times=N]    answers after S seconds (the first N times only)
     /flaky/{id}?fail=N              503 for the first N requests, then 200
     /throttle/{id}?retry_after=S    429 with Retry-After until S seconds pass, then 200
     /broken/{id}                    503 forever (dead-letter demo)
@@ -69,6 +69,7 @@ class State:
 
     def reset(self) -> None:
         self.flaky_hits: dict[int, int] = {}
+        self.slow_hits: dict[int, int] = {}
         self.throttle_started: dict[int, float] = {}
         self.editable = _seed_pages()
 
@@ -235,8 +236,16 @@ def reset() -> dict[str, str]:
 
 
 @app.get("/slow/{item_id}")
-async def slow(request: Request, item_id: int, delay: float = Query(10, ge=0, le=120)) -> Response:
-    await asyncio.sleep(delay)
+async def slow(
+    request: Request,
+    item_id: int,
+    delay: float = Query(10, ge=0, le=120),
+    times: int | None = Query(None, ge=0, le=100),
+) -> Response:
+    hits = state.slow_hits.get(item_id, 0) + 1
+    state.slow_hits[item_id] = hits
+    if times is None or hits <= times:  # slow every time, or only the first `times`
+        await asyncio.sleep(delay)
     it = item_or_404(item_id)
     return html_page(request, content.layout(it.title, content.item_body(it)), SITE_EPOCH)
 

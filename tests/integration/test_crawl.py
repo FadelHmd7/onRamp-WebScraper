@@ -29,7 +29,9 @@ def test_four_workers_store_every_page_once(
     site = local_site(live_testsite, max_pages=1000, max_depth=40)
     crawl = LocalCrawl(pg_engine, redis_client, site)
     crawl_id = start_crawl(crawl.context(), site.key)
-    crawl.run(workers=4)
+    # Generous: on a laptop, Docker Desktop's port forwarding makes each of the
+    # ~20 database round trips per page slow (37-110 s seen); CI takes far less.
+    crawl.run(workers=4, timeout=300)
 
     statuses = Counter(job_result.status for _, job_result in crawl.results)
     assert statuses["fetched"] >= CATALOG_AND_ITEMS

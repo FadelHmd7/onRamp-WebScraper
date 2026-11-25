@@ -29,12 +29,14 @@ def create_crawl(
     mode: str,
     created_by: int | None = None,
     seeds: list[str] | None = None,
+    max_depth: int | None = None,
 ) -> Crawl:
-    """A running crawl. ``seeds`` only when they replace the site's configured ones."""
+    """A running crawl. ``seeds`` and ``max_depth`` only when they replace the site's."""
     crawl = Crawl(
         site_key=site_key,
         mode=mode,
         seeds=seeds,
+        max_depth=max_depth,
         status="running",
         created_by=created_by,
         started_at=datetime.now(UTC),

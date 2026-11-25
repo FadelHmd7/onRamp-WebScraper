@@ -113,11 +113,14 @@ def process(job: Job, ctx: CrawlContext, redelivered: bool = False) -> JobResult
     crawl_id = uuid.UUID(job.crawl_id)
     site = ctx.sites[job.site_key]
     with ctx.sessions() as session:
-        mode = session.scalar(
-            select(Crawl.mode).where(Crawl.id == crawl_id, Crawl.status != "failed")
-        )
-        if mode is None:
+        crawl = session.scalars(
+            select(Crawl).where(Crawl.id == crawl_id, Crawl.status != "failed")
+        ).one_or_none()
+        if crawl is None:
             return JobResult("cancelled")
+        mode = crawl.mode
+        if crawl.max_depth is not None:  # this crawl goes less deep than the site allows
+            site = site.model_copy(update={"max_depth": crawl.max_depth})
         state = crawls.url_state(session, crawl_id, job.url)
         if state is not None and state.status in crawls.FINAL_STATUSES:
             # A duplicate message for a URL that is already done.
@@ -159,8 +162,10 @@ def _finish_if_done(ctx: CrawlContext, crawl_id: uuid.UUID) -> None:
             return
         log.info("crawl %s finished", crawl_id)
         crawl = session.get(Crawl, crawl_id)
-        if crawl is None or crawl.mode != "full" or crawl.seeds is not None:
-            return  # only a full crawl from the configured seeds sees the whole site
+        if crawl is None or crawl.mode != "full":
+            return
+        if crawl.seeds is not None or crawl.max_depth is not None:
+            return  # only a crawl from the configured seeds, at full depth, sees it all
         site = ctx.sites[crawl.site_key]
         if ctx.frontier.accepted_count(str(crawl_id)) >= site.max_pages:
             log.info("crawl %s hit its page budget; no pages marked removed", crawl_id)

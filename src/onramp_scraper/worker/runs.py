@@ -21,9 +21,12 @@ def start_crawl(
     mode: str = "full",
     seeds: list[str] | None = None,
     created_by: int | None = None,
+    max_depth: int | None = None,
 ) -> uuid.UUID:
-    """Start a crawl of one site. ``seeds`` replaces the configured seeds (demos, retries).
+    """Start a crawl of one site.
 
+    ``seeds`` replaces the configured seeds and ``max_depth`` lowers the site's
+    depth limit (demos, re-checks: ``max_depth=0`` crawls only the seeds).
     Seeds must be in the site's scope (allowed host and include patterns);
     robots.txt is still checked for each one when it is fetched.
     """
@@ -32,6 +35,8 @@ def start_crawl(
     if mode not in MODES:
         raise ValueError(f"mode must be one of {MODES}")
     site = ctx.sites[site_key]
+    if max_depth is not None and not 0 <= max_depth <= site.max_depth:
+        raise ValueError(f"max_depth must be between 0 and the site's {site.max_depth}")
     raw = seeds if seeds is not None else [str(s) for s in site.seeds]
     urls = [u for s in raw if (u := normalize_url(s)) is not None]
     outside = [u for u in urls if not in_scope(site, u, 0)]
@@ -40,7 +45,7 @@ def start_crawl(
 
     with ctx.sessions.begin() as session:
         custom = urls if seeds is not None else None
-        crawl_id = crawls.create_crawl(session, site_key, mode, created_by, custom).id
+        crawl_id = crawls.create_crawl(session, site_key, mode, created_by, custom, max_depth).id
     accepted = ctx.frontier.offer(str(crawl_id), site, urls)
     with ctx.sessions.begin() as session:
         crawls.record_queued(session, crawl_id, accepted, 0)

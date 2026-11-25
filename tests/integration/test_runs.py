@@ -134,3 +134,19 @@ def test_jobs_of_a_cancelled_crawl_do_nothing(
         session.execute(text("UPDATE crawls SET status = 'failed' WHERE id = :c"), {"c": crawl_id})
     crawl.run(workers=1)
     assert [result.status for _, result in crawl.results] == ["cancelled"]
+
+
+def test_a_crawl_can_go_less_deep_than_its_site(
+    sessions: sessionmaker[Session], pg_engine: Engine, redis_client: Redis, live_testsite: str
+) -> None:
+    site = local_site(live_testsite, max_depth=40)
+    crawl = LocalCrawl(pg_engine, redis_client, site)
+    seed = f"{live_testsite}/items/1"
+    crawl_id = start_crawl(crawl.context(), site.key, seeds=[seed], max_depth=0)
+    crawl.run(workers=2)
+    assert [job.url for job, _ in crawl.results] == [seed]  # its links were not followed
+    with sessions() as session:
+        stored = session.scalar(text("SELECT max_depth FROM crawls WHERE id = :c"), {"c": crawl_id})
+    assert stored == 0
+    with pytest.raises(ValueError, match="max_depth must be between 0 and the site's 40"):
+        start_crawl(crawl.context(), site.key, max_depth=41)

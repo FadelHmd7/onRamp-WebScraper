@@ -56,6 +56,9 @@ def main(argv: list[str]) -> int:
     start.add_argument("site")
     start.add_argument("--mode", choices=MODES, default="full")
     start.add_argument("--seed", action="append", help="crawl these URLs instead of the seeds")
+    start.add_argument(
+        "--max-depth", type=int, help="follow links at most this deep (0: the seeds only)"
+    )
     status = commands.add_parser("status", help="print a crawl's progress as JSON")
     status.add_argument("crawl_id")
     wait = commands.add_parser("wait", help="print progress until the crawl finishes")
@@ -69,7 +72,7 @@ def main(argv: list[str]) -> int:
     args = parser.parse_args(argv)
 
     if args.command == "start":
-        print(start_crawl(context(), args.site, args.mode, args.seed))
+        print(start_crawl(context(), args.site, args.mode, args.seed, max_depth=args.max_depth))
     elif args.command == "status":
         print(json.dumps(describe(_progress(args.crawl_id))))
     elif args.command == "wait":

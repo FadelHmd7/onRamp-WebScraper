@@ -1,3 +1,4 @@
+import time
 from collections.abc import Iterator
 
 import pytest
@@ -101,3 +102,12 @@ def test_reset_restores_state(client: TestClient) -> None:
 def test_whoami_echoes_user_agent(client: TestClient) -> None:
     html = client.get("/whoami", headers={"User-Agent": "probe/1.0"}).text
     assert '<p id="user-agent">probe/1.0</p>' in html
+
+
+def test_slow_can_be_slow_only_the_first_times(client: TestClient) -> None:
+    timings = []
+    for _ in range(2):
+        started = time.perf_counter()
+        assert client.get("/slow/1?delay=0.3&times=1").status_code == 200
+        timings.append(time.perf_counter() - started)
+    assert timings[0] >= 0.3 > timings[1]  # slow once, then fast
