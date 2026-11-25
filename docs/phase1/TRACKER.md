@@ -13,8 +13,8 @@ Spec: `docs/phase1/SPEC.md`. Stack: `docs/DECISIONS.md`.
 
 | | |
 | --- | --- |
-| Current | **U2** — Login and roles |
-| Next | **U3** — Dashboard |
+| Current | **U3** — Dashboard |
+| Next | **U4** — Search page |
 
 Status values: `todo`, `doing`, `done`.
 
@@ -100,7 +100,7 @@ After F3: push `main`, then create and push `phase-1`.
 | ID | Task | Done when | Status |
 | --- | --- | --- | --- |
 | U1 | React + Vite + TypeScript scaffold, nginx image proxying `/api`, lint and build in CI | UI container serves the app in compose. Verified: `/` serves the React app, `/api/health` is proxied, deep links fall back to the app, hashed assets cached for a year and `index.html` never; CI `ui` job runs ESLint, TypeScript, Vitest and the build | done |
-| U2 | Login; navigation and actions differ for admin and viewer | Viewer never sees admin actions | todo |
+| U2 | Login; navigation and actions differ for admin and viewer | Viewer never sees admin actions: `<AdminOnly>` renders nothing for a viewer (tested for both roles; the dashboard's admin actions in U3 use it). Login, session kept across reloads, sign out, and an expired token sends you back to login; checked in Chromium on desktop and phone width | done |
 | U3 | Dashboard polling every few seconds: crawl progress, queue length, active workers, errors. Admin: start crawl, retry dead-letter jobs | Numbers move during a crawl | todo |
 | U4 | Search page with snippets and a site filter | Highlighted results, filter works | todo |
 | U5 | Document page: cleaned blocks (tables included), source URL, version history | Multi-version document shows every version | todo |

@@ -1,8 +1,29 @@
 import { NavLink, Route, Routes } from "react-router";
 
+import { AuthProvider, RequireAuth, useAuth } from "./auth";
 import { HealthBadge } from "./components/HealthBadge";
+import { Login } from "./pages/Login";
 
 export function App() {
+  return (
+    <AuthProvider>
+      <Routes>
+        <Route path="/login" element={<Login />} />
+        <Route
+          path="*"
+          element={
+            <RequireAuth>
+              <Shell />
+            </RequireAuth>
+          }
+        />
+      </Routes>
+    </AuthProvider>
+  );
+}
+
+function Shell() {
+  const { user, logout } = useAuth();
   return (
     <div className="shell">
       <header className="topbar">
@@ -13,6 +34,13 @@ export function App() {
           </NavLink>
         </nav>
         <HealthBadge />
+        <span className="user">
+          {user?.username}
+          <span className={`badge ${user?.role === "admin" ? "warn" : ""}`}>{user?.role}</span>
+          <button type="button" className="secondary" onClick={logout}>
+            Sign out
+          </button>
+        </span>
       </header>
       <main className="content">
         <Routes>
@@ -28,7 +56,7 @@ function Home() {
   return (
     <section>
       <h1>Dashboard</h1>
-      <p className="muted">The UI is served by nginx and reaches the API through /api.</p>
+      <p className="muted">Crawl progress, queue and workers arrive with the dashboard (U3).</p>
     </section>
   );
 }
