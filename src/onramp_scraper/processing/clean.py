@@ -11,21 +11,22 @@ Block shapes (stored as JSONB in document_versions.blocks):
     {"type": "heading",   "level": 2, "text": "Summary"}
     {"type": "paragraph", "text": "..."}
     {"type": "list",      "ordered": false, "items": ["...", "..."]}
-    {"type": "table",     "caption": null, "header": ["..."], "rows": [["..."]]}
+    {"type": "table",     "caption": null, "header": ["..."], "rows": [["..."]],
+                          "row_headers": false}         (see processing/tables.py)
     {"type": "code",      "text": "..."}
     {"type": "quote",     "text": "..."}
 
 Parsed with BeautifulSoup and lxml; never with regular expressions.
 """
 
-import re
 from dataclasses import dataclass
 from typing import Any
 
 from bs4 import BeautifulSoup, Tag
 from bs4.element import Comment, NavigableString
 
-from onramp_scraper.processing.tables import parse_table
+from onramp_scraper.processing.tables import is_layout_table, parse_table
+from onramp_scraper.processing.text import collapse
 
 Block = dict[str, Any]
 
@@ -70,23 +71,12 @@ BLOCK_LEVEL = frozenset(
     }
 )  # fmt: skip
 
-_SPACE = re.compile(r"\s+")
-# Inline elements are joined with spaces so words never run together; this
-# removes the stray space that leaves before punctuation ("Austen , Brontë").
-_SPACE_BEFORE_PUNCT = re.compile(r"\s+([,.;:!?%)\]])")
-_SPACE_AFTER_OPEN = re.compile(r"([(\[])\s+")
-
 
 @dataclass(frozen=True)
 class CleanedPage:
     title: str
     blocks: list[Block]
     text: str  # plain text of all blocks, for search and snippets
-
-
-def collapse(text: str) -> str:
-    text = _SPACE.sub(" ", text).strip()
-    return _SPACE_AFTER_OPEN.sub(r"\1", _SPACE_BEFORE_PUNCT.sub(r"\1", text))
 
 
 def _is_ad(tag: Tag) -> bool:
@@ -187,7 +177,7 @@ class _Walker:
             elif name == "dl":
                 if items := _definition_items(child):
                     self.emit({"type": "list", "ordered": False, "items": items})
-            elif name == "table":
+            elif name == "table" and not is_layout_table(child):
                 table = parse_table(child)
                 if table is not None:
                     self.emit(table)
@@ -201,7 +191,7 @@ class _Walker:
                 self._inline.append(" ")
             elif name in INLINE and not _has_block_child(child):
                 self._inline.append(child.get_text(" "))
-            else:  # a block container: div, section, article, li outside a list, ...
+            else:  # a container: div, section, article, a layout table and its cells, ...
                 self.flush()
                 self.walk(child)
                 self.flush()

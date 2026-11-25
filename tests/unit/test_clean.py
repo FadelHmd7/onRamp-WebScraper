@@ -5,7 +5,8 @@ from typing import Any
 
 import pytest
 
-from onramp_scraper.processing.clean import CleanedPage, block_text, clean_html, collapse
+from onramp_scraper.processing.clean import CleanedPage, block_text, clean_html
+from onramp_scraper.processing.text import collapse
 from onramp_scraper.sites import load_sites
 from onramp_testsite import content
 
@@ -147,7 +148,13 @@ def test_structure_is_kept_in_order() -> None:
         {"type": "heading", "level": 2, "text": "List"},
         {"type": "list", "ordered": True, "items": ["one", "two", "two-a"]},
         {"type": "list", "ordered": False, "items": ["Pages: 345"]},
-        {"type": "table", "caption": None, "header": ["Field", "Value"], "rows": [["SKU", "A1"]]},
+        {
+            "type": "table",
+            "caption": None,
+            "header": ["Field", "Value"],
+            "rows": [["SKU", "A1"]],
+            "row_headers": False,
+        },
         {"type": "code", "text": "code  line"},
         {"type": "quote", "text": "A quote."},
     ]
