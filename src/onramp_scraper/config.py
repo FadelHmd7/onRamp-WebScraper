@@ -37,6 +37,10 @@ class Settings(BaseSettings):
     retry_max_delay: float = Field(default=300.0, gt=0)
     # A job running longer than this is stopped and counts as a failed attempt.
     task_soft_time_limit: int = Field(default=120, ge=10)
+    # A worker refreshes its heartbeat key every interval; a dead one's key
+    # expires after the TTL, so "active workers" drops within the TTL.
+    heartbeat_ttl: float = Field(default=15.0, gt=0)
+    heartbeat_interval: float = Field(default=5.0, gt=0)
 
 
 @lru_cache

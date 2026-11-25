@@ -6,6 +6,7 @@
     docker compose exec worker python -m onramp_scraper.worker.cli status <crawl-id>
     docker compose exec worker python -m onramp_scraper.worker.cli wait <crawl-id>
     docker compose exec worker python -m onramp_scraper.worker.cli dead
+    docker compose exec worker python -m onramp_scraper.worker.cli workers
     docker compose exec worker python -m onramp_scraper.worker.cli retry <dead-letter-id>
 """
 
@@ -19,6 +20,7 @@ from datetime import UTC, datetime
 from onramp_scraper.storage.crawls import CrawlProgress, progress
 from onramp_scraper.storage.dead_letters import list_dead
 from onramp_scraper.worker.app import context
+from onramp_scraper.worker.heartbeat import active_workers
 from onramp_scraper.worker.runs import MODES, retry_dead_letter, start_crawl
 
 
@@ -61,6 +63,7 @@ def main(argv: list[str]) -> int:
     wait.add_argument("--every", type=float, default=2.0, help="seconds between lines")
     wait.add_argument("--timeout", type=float, default=3600.0)
     commands.add_parser("dead", help="list the dead-letter queue as JSON lines")
+    commands.add_parser("workers", help="list workers with a live heartbeat as JSON lines")
     retry = commands.add_parser("retry", help="send a dead-letter URL again")
     retry.add_argument("dead_letter_id", type=int)
     args = parser.parse_args(argv)
@@ -95,6 +98,9 @@ def main(argv: list[str]) -> int:
                     }
                 )
             )
+    elif args.command == "workers":
+        for worker in active_workers(context().frontier.redis):
+            print(json.dumps(worker))
     elif args.command == "retry":
         if not retry_dead_letter(context(), args.dead_letter_id):
             print(f"dead letter {args.dead_letter_id} is not in the queue", file=sys.stderr)

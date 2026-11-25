@@ -13,8 +13,8 @@ Spec: `docs/phase1/SPEC.md`. Stack: `docs/DECISIONS.md`.
 
 | | |
 | --- | --- |
-| Current | **W4** — Worker heartbeats |
-| Next | **W5** — Incremental re-crawl and removal |
+| Current | **W5** — Incremental re-crawl and removal |
+| Next | **W6** — Failure demo scripts |
 
 Status values: `todo`, `doing`, `done`.
 
@@ -76,7 +76,7 @@ After F3: push `main`, then create and push `phase-1`.
 | W1 | Celery app on RabbitMQ: `crawl_page` task (fetch → clean → validate → store → enqueue links), `acks_late`, `reject_on_worker_lost`, prefetch 1, concurrency 1 | Crawl of `testsite` with 4 workers stores every page once. Verified: 4 Celery containers stored all 630 pages once in about 25 s (157/161/157/155 per worker); integration test with 4 worker threads; a redelivered job re-sends links its crashed run accepted | done |
 | W2 | Crawl runs: create a crawl, enqueue seeds, count queued, done, failed and skipped pages, mark the run finished | Progress counts match the database after a run. Verified in compose: `cli wait` shows a 4-worker re-crawl reach 630/630 (all unchanged) and finish; finishing happens once even when 8 jobs race | done |
 | W3 | Retries: exponential backoff with jitter, honour `Retry-After`, max N attempts, then a dead-letter row (URL, last error, attempts); re-enqueue from the dead-letter queue | `/flaky` succeeds after retries, `/always-500` lands in the dead-letter queue, `/429` waits as asked. Verified with 4 Celery workers: flaky stored on attempt 3, `/broken` dead after 5 jittered attempts, `/throttle` retried after exactly its 5 s `Retry-After`; dead-letter retry resolves on success | done |
-| W4 | Worker heartbeats in Redis (TTL keys), used for "active workers" | Killing a worker drops the count within the TTL | todo |
+| W4 | Worker heartbeats in Redis (TTL keys), used for "active workers" | Killing a worker drops the count within the TTL. Verified: 4 heartbeats, `docker kill` one, count 3 within 16 s (TTL 15 s + 1 s polling); a clean stop leaves at once | done |
 | W5 | Incremental re-crawl (conditional requests, only changed pages versioned) and removal marking (404/410, or not reached by a full crawl) | Editing a `testsite` page gives exactly one new version; deleting one marks it removed | todo |
 | W6 | Failure demo scripts in `scripts/demo/`: kill mid-task, timeout, 429, always-fail | Each script prints the expected outcome | todo |
 | W7 | Benchmark: the same 500+ `testsite` pages with 1, 2 and 4 workers; results CSV and chart | Chart saved in `docs/phase1/` with a short analysis | todo |

@@ -17,12 +17,19 @@ from functools import lru_cache
 from typing import Any
 
 from celery import Celery, Task
+from celery.signals import (
+    task_postrun,
+    task_prerun,
+    worker_process_init,
+    worker_process_shutdown,
+)
 from redis.exceptions import RedisError
 from sqlalchemy.exc import InterfaceError, OperationalError
 
 from onramp_scraper.config import get_settings
 from onramp_scraper.sites import load_sites
 from onramp_scraper.storage.db import get_engine
+from onramp_scraper.worker.heartbeat import Heartbeat
 from onramp_scraper.worker.pipeline import CrawlContext, Job, process
 from onramp_scraper.worker.runtime import build_context
 
@@ -85,6 +92,43 @@ def crawl_page(self: Task[Any, Any], job: dict[str, Any]) -> dict[str, Any]:
     redelivered = bool((self.request.delivery_info or {}).get("redelivered"))
     result = process(Job.from_message(job), context(), redelivered=redelivered)
     return {"status": result.status, "reason": result.reason, "children": len(result.children)}
+
+
+# ---------------------------------------------------------------- heartbeat
+# worker_process_init runs in the process that executes jobs, after the fork.
+
+_heartbeat: Heartbeat | None = None
+
+
+@worker_process_init.connect
+def start_heartbeat(**_: Any) -> None:
+    global _heartbeat
+    from redis import Redis
+
+    _heartbeat = Heartbeat(
+        Redis.from_url(settings.redis_url),
+        ttl=settings.heartbeat_ttl,
+        interval=settings.heartbeat_interval,
+    )
+    _heartbeat.start()
+
+
+@worker_process_shutdown.connect
+def stop_heartbeat(**_: Any) -> None:
+    if _heartbeat is not None:
+        _heartbeat.stop(clean=True)  # a clean stop leaves at once; a kill expires
+
+
+@task_prerun.connect(sender=crawl_page)
+def job_started(kwargs: dict[str, Any] | None = None, **_: Any) -> None:
+    if _heartbeat is not None:
+        _heartbeat.working_on((kwargs or {}).get("job", {}).get("url"))
+
+
+@task_postrun.connect(sender=crawl_page)
+def job_finished(**_: Any) -> None:
+    if _heartbeat is not None:
+        _heartbeat.working_on(None)
 
 
 @app.task(name="worker.ping")
