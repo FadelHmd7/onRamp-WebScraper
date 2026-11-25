@@ -138,16 +138,7 @@ def progress(session: Session, crawl_id: uuid.UUID) -> CrawlProgress | None:
     )
     for status, count in rows:
         counts[status] = count
-    return CrawlProgress(
-        crawl_id=crawl.id,
-        site_key=crawl.site_key,
-        mode=crawl.mode,
-        status=crawl.status,
-        created_at=crawl.created_at,
-        started_at=crawl.started_at,
-        finished_at=crawl.finished_at,
-        counts=counts,
-    )
+    return _progress_of(crawl, counts)
 
 
 def finish_if_done(session: Session, crawl_id: uuid.UUID) -> bool:
@@ -177,4 +168,64 @@ def reopen(session: Session, crawl_id: uuid.UUID) -> None:
         update(Crawl)
         .where(Crawl.id == crawl_id, Crawl.status == "finished")
         .values(status="running", finished_at=None)
+    )
+
+
+def list_crawls(
+    session: Session,
+    site_key: str | None = None,
+    status: str | None = None,
+    limit: int = 20,
+    offset: int = 0,
+) -> tuple[list[CrawlProgress], int]:
+    """A page of crawls, newest first, with their counts (one grouped query), and the total."""
+    query = select(Crawl)
+    if site_key is not None:
+        query = query.where(Crawl.site_key == site_key)
+    if status is not None:
+        query = query.where(Crawl.status == status)
+    total = session.scalar(select(func.count()).select_from(query.subquery())) or 0
+    rows = list(
+        session.scalars(
+            query.order_by(Crawl.created_at.desc(), Crawl.id).limit(limit).offset(offset)
+        )
+    )
+    counts: dict[uuid.UUID, dict[str, int]] = {c.id: dict.fromkeys(STATUSES, 0) for c in rows}
+    if rows:
+        grouped = session.execute(
+            select(CrawlUrl.crawl_id, CrawlUrl.status, func.count())
+            .where(CrawlUrl.crawl_id.in_(list(counts)))
+            .group_by(CrawlUrl.crawl_id, CrawlUrl.status)
+        )
+        for crawl_id, url_status, count in grouped:
+            counts[crawl_id][url_status] = count
+    return [_progress_of(c, counts[c.id]) for c in rows], total
+
+
+def _progress_of(crawl: Crawl, counts: dict[str, int]) -> CrawlProgress:
+    return CrawlProgress(
+        crawl_id=crawl.id,
+        site_key=crawl.site_key,
+        mode=crawl.mode,
+        status=crawl.status,
+        created_at=crawl.created_at,
+        started_at=crawl.started_at,
+        finished_at=crawl.finished_at,
+        counts=counts,
+    )
+
+
+def recent_errors(session: Session, crawl_id: uuid.UUID, limit: int = 20) -> list[CrawlUrl]:
+    """URLs that failed, died, or are waiting for a retry, most recent first."""
+    return list(
+        session.scalars(
+            select(CrawlUrl)
+            .where(
+                CrawlUrl.crawl_id == crawl_id,
+                CrawlUrl.last_error.is_not(None),
+                CrawlUrl.status.in_(("failed", "dead", "queued")),
+            )
+            .order_by(CrawlUrl.updated_at.desc())
+            .limit(limit)
+        )
     )

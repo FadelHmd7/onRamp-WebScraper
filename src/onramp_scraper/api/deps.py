@@ -11,7 +11,7 @@ through unprotected.
 """
 
 from collections.abc import Iterator
-from typing import Annotated
+from typing import TYPE_CHECKING, Annotated
 
 import jwt
 from fastapi import Depends, HTTPException, status
@@ -23,6 +23,9 @@ from onramp_scraper.config import Settings, get_settings
 from onramp_scraper.storage.db import get_engine
 from onramp_scraper.storage.models import User
 from onramp_scraper.storage.users import get_user
+
+if TYPE_CHECKING:
+    from onramp_scraper.worker.pipeline import CrawlContext
 
 # tokenUrl makes Swagger's "Authorize" button log in through POST /auth/token.
 oauth2 = OAuth2PasswordBearer(tokenUrl="auth/token", auto_error=False)
@@ -72,6 +75,17 @@ def require_admin(user: Annotated[User, Depends(current_user)]) -> User:
     if user.role != "admin":
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Admin role required")
     return user
+
+
+def crawl_context() -> "CrawlContext":
+    """What starting a crawl needs: the frontier, sites and Celery to send jobs.
+
+    Imported on first use, so the API process loads the worker code only
+    when an admin actually starts a crawl. Tests replace this dependency.
+    """
+    from onramp_scraper.worker.app import context
+
+    return context()
 
 
 CurrentUser = Annotated[User, Depends(current_user)]
