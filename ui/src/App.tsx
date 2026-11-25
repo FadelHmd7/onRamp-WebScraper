@@ -4,6 +4,7 @@ import { AuthProvider, RequireAuth, useAuth } from "./auth";
 import { HealthBadge } from "./components/HealthBadge";
 import { Dashboard } from "./pages/Dashboard";
 import { Login } from "./pages/Login";
+import { Search } from "./pages/Search";
 
 export function App() {
   return (
@@ -33,6 +34,7 @@ function Shell() {
           <NavLink to="/" end>
             Dashboard
           </NavLink>
+          <NavLink to="/search">Search</NavLink>
         </nav>
         <HealthBadge />
         <span className="user">
@@ -46,6 +48,7 @@ function Shell() {
       <main className="content">
         <Routes>
           <Route path="/" element={<Dashboard />} />
+          <Route path="/search" element={<Search />} />
           <Route path="*" element={<NotFound />} />
         </Routes>
       </main>
