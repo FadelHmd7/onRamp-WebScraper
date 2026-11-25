@@ -96,6 +96,9 @@ class Crawl(Base):
     created_at: Mapped[datetime] = _now()
     started_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     finished_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    # NULL: the site's configured seeds. A list: custom seeds (a demo, a retry);
+    # such a crawl never marks unreached pages as removed (migration 0002).
+    seeds: Mapped[list[str] | None] = mapped_column(JSONB)
 
 
 class CrawlUrl(Base):

@@ -129,7 +129,7 @@ erDiagram
 
 **Conditional requests first.** `pages.etag` and `pages.last_modified` come from the last successful fetch. An incremental crawl sends them back; a `304 Not Modified` means `unchanged` without downloading or hashing anything (books.toscrape.com). Sites without these headers fall back to the content hash (Standard Ebooks, Inventaire).
 
-**Removed pages stay.** A page that answers 404 or 410, or that a finished full crawl did not reach, gets `status = removed` and `removed_at`. Its versions remain readable.
+**Removed pages stay.** A page that answers 404 or 410, or that a finished full crawl did not reach, gets `status = removed` and `removed_at`. Its versions remain readable, and it becomes `active` again if it reappears. "Did not reach" is only trusted when the crawl started from the site's configured seeds (`crawls.seeds` is NULL; a demo crawl of chosen URLs records them there) and did not run out of page budget. A page that was reached but failed (a 503, the dead-letter queue) stays active: it may only be down for a while.
 
 **Links belong to a version.** A page's links change with its content. The links of the current version are "what this page links to now"; Phase 2 can follow `links.target_url` to `pages.url` to walk the graph.
 

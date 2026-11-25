@@ -24,11 +24,17 @@ FINAL_STATUSES = frozenset({"fetched", "unchanged", "skipped", "failed", "dead"}
 
 
 def create_crawl(
-    session: Session, site_key: str, mode: str, created_by: int | None = None
+    session: Session,
+    site_key: str,
+    mode: str,
+    created_by: int | None = None,
+    seeds: list[str] | None = None,
 ) -> Crawl:
+    """A running crawl. ``seeds`` only when they replace the site's configured ones."""
     crawl = Crawl(
         site_key=site_key,
         mode=mode,
+        seeds=seeds,
         status="running",
         created_by=created_by,
         started_at=datetime.now(UTC),

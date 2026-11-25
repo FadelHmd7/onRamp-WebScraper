@@ -39,7 +39,8 @@ def start_crawl(
         raise ValueError(f"seeds outside site {site_key!r}: {outside or raw}")
 
     with ctx.sessions.begin() as session:
-        crawl_id = crawls.create_crawl(session, site_key, mode, created_by).id
+        custom = urls if seeds is not None else None
+        crawl_id = crawls.create_crawl(session, site_key, mode, created_by, custom).id
     accepted = ctx.frontier.offer(str(crawl_id), site, urls)
     with ctx.sessions.begin() as session:
         crawls.record_queued(session, crawl_id, accepted, 0)

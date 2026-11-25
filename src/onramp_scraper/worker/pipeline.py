@@ -21,6 +21,7 @@ import logging
 import uuid
 from collections.abc import Callable
 from dataclasses import asdict, dataclass, field, replace
+from datetime import UTC, datetime
 from typing import Any
 
 from sqlalchemy import select
@@ -29,16 +30,25 @@ from sqlalchemy.orm import Session, sessionmaker
 from onramp_scraper.crawler.fetch import FetchResult, Outcome, PoliteFetcher
 from onramp_scraper.crawler.frontier import Frontier, extract_links, in_scope, page_nofollow
 from onramp_scraper.parsing import parse_html
+from onramp_scraper.processing.changes import (
+    Decision,
+    StoredPage,
+    conditional_headers,
+    unchanged_by_headers,
+)
 from onramp_scraper.processing.clean import clean_html
 from onramp_scraper.processing.document import InvalidDocument
 from onramp_scraper.processing.fields import extract_fields
 from onramp_scraper.sites import SiteConfig
 from onramp_scraper.storage import crawls, dead_letters
 from onramp_scraper.storage.models import Crawl
-from onramp_scraper.storage.writes import store_page
+from onramp_scraper.storage.versions import load_page, mark_removed, stored_links, sweep_unreached
+from onramp_scraper.storage.writes import store_not_modified, store_page
 from onramp_scraper.worker.retry import RetryPolicy
 
 log = logging.getLogger(__name__)
+
+GONE = (404, 410)  # the page no longer exists: marked removed, its versions kept
 
 
 @dataclass(frozen=True)
@@ -99,25 +109,26 @@ class Handled:
     http_status: int | None = None
 
 
-def _cancelled(session: Session, crawl_id: uuid.UUID) -> bool:
-    status = session.scalar(select(Crawl.status).where(Crawl.id == crawl_id))
-    return status is None or status == "failed"
-
-
 def process(job: Job, ctx: CrawlContext, redelivered: bool = False) -> JobResult:
     crawl_id = uuid.UUID(job.crawl_id)
     site = ctx.sites[job.site_key]
     with ctx.sessions() as session:
-        if _cancelled(session, crawl_id):
+        mode = session.scalar(
+            select(Crawl.mode).where(Crawl.id == crawl_id, Crawl.status != "failed")
+        )
+        if mode is None:
             return JobResult("cancelled")
         state = crawls.url_state(session, crawl_id, job.url)
         if state is not None and state.status in crawls.FINAL_STATUSES:
             # A duplicate message for a URL that is already done.
             return JobResult("duplicate", f"already {state.status}")
+        # Incremental: send the stored validators back, so an unchanged page
+        # costs a 304 and no download. A full crawl downloads everything.
+        stored = load_page(session, job.url) if mode == "incremental" else None
 
     try:
-        fetch = ctx.fetcher.fetch(job.url, site)
-        handled = _handle(job, site, fetch, ctx)
+        fetch = ctx.fetcher.fetch(job.url, site, **conditional_headers(stored))
+        handled = _handle(job, site, fetch, ctx, stored)
     except Exception as exc:  # a bug or a time limit: counts as a failed attempt
         log.exception("job for %s raised", job.url)
         handled = Handled("retry", f"{type(exc).__name__}: {exc}")
@@ -144,8 +155,19 @@ def process(job: Job, ctx: CrawlContext, redelivered: bool = False) -> JobResult
 
 def _finish_if_done(ctx: CrawlContext, crawl_id: uuid.UUID) -> None:
     with ctx.sessions.begin() as session:  # a new transaction: it sees this job's commit
-        if crawls.finish_if_done(session, crawl_id):
-            log.info("crawl %s finished", crawl_id)
+        if not crawls.finish_if_done(session, crawl_id):
+            return
+        log.info("crawl %s finished", crawl_id)
+        crawl = session.get(Crawl, crawl_id)
+        if crawl is None or crawl.mode != "full" or crawl.seeds is not None:
+            return  # only a full crawl from the configured seeds sees the whole site
+        site = ctx.sites[crawl.site_key]
+        if ctx.frontier.accepted_count(str(crawl_id)) >= site.max_pages:
+            log.info("crawl %s hit its page budget; no pages marked removed", crawl_id)
+            return
+        when = crawl.finished_at or datetime.now(UTC)
+        removed = sweep_unreached(session, crawl_id, crawl.site_key, when)
+        log.info("crawl %s: %d pages not reached, marked removed", crawl_id, removed)
 
 
 def _retry_or_bury(job: Job, handled: Handled, ctx: CrawlContext) -> JobResult:
@@ -202,7 +224,11 @@ def _retry_or_bury(job: Job, handled: Handled, ctx: CrawlContext) -> JobResult:
     return JobResult("dead", handled.reason)
 
 
-def _handle(job: Job, site: SiteConfig, fetch: FetchResult, ctx: CrawlContext) -> Handled:
+def _handle(
+    job: Job, site: SiteConfig, fetch: FetchResult, ctx: CrawlContext, stored: StoredPage | None
+) -> Handled:
+    if (decision := unchanged_by_headers(stored, fetch)) is not None:
+        return _not_modified(job, site, fetch, ctx, decision)
     if fetch.outcome is Outcome.OK:
         return _store(job, site, fetch, ctx)
     if fetch.outcome is Outcome.REDIRECT and fetch.location:
@@ -215,7 +241,25 @@ def _handle(job: Job, site: SiteConfig, fetch: FetchResult, ctx: CrawlContext) -
     if fetch.outcome is Outcome.RETRY:  # timeout, connection error, 429, 5xx
         reason = fetch.error or "temporary failure"
         return Handled("retry", reason, retry_after=fetch.retry_after, http_status=fetch.status)
-    return Handled("failed", fetch.error or str(fetch.outcome), http_status=fetch.status)
+    reason = fetch.error or str(fetch.outcome)
+    if fetch.status in GONE:
+        with ctx.sessions.begin() as session:
+            if mark_removed(session, job.url, fetch.fetched_at):
+                reason += ": page marked removed"
+    return Handled("failed", reason, http_status=fetch.status)
+
+
+def _not_modified(
+    job: Job, site: SiteConfig, fetch: FetchResult, ctx: CrawlContext, decision: Decision
+) -> Handled:
+    """304 or the same ETag: nothing to download or parse. Links come from the stored version."""
+    with ctx.sessions.begin() as session:
+        store_not_modified(
+            session, site=site, crawl_id=uuid.UUID(job.crawl_id), fetch=fetch, decision=decision
+        )
+        links = stored_links(session, job.url)
+    candidates = Frontier.candidates(site, links, job.depth)
+    return Handled("unchanged", decision.reason, candidates, job.depth + 1)
 
 
 def _store(job: Job, site: SiteConfig, fetch: FetchResult, ctx: CrawlContext) -> Handled:

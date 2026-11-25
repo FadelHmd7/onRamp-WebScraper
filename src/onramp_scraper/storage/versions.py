@@ -25,11 +25,12 @@ from sqlalchemy import select, update
 from sqlalchemy.dialects.postgresql import insert
 from sqlalchemy.orm import Session
 
+from onramp_scraper.crawler.frontier import Link as FoundLink
 from onramp_scraper.processing.changes import Change, Decision, StoredPage, decide
 from onramp_scraper.processing.clean import CleanedPage
 from onramp_scraper.processing.document import build_document, content_hash
 from onramp_scraper.sites import SiteConfig
-from onramp_scraper.storage.models import DocumentVersion, Page
+from onramp_scraper.storage.models import CrawlUrl, DocumentVersion, Link, Page
 
 
 @dataclass(frozen=True)
@@ -176,3 +177,40 @@ def mark_removed(session: Session, url: str, when: datetime) -> bool:
         .values(status="removed", removed_at=when)
     )
     return bool(getattr(result, "rowcount", 0))
+
+
+def stored_links(session: Session, url: str) -> list[FoundLink]:
+    """The links of the page's current version, in page order.
+
+    A 304 has no body to read links from; these are the same links, because
+    the page has not changed since that version.
+    """
+    rows = session.execute(
+        select(Link.target_url, Link.text, Link.nofollow)
+        .join(DocumentVersion, DocumentVersion.id == Link.version_id)
+        .join(
+            Page,
+            (Page.id == DocumentVersion.page_id)
+            & (Page.current_version == DocumentVersion.version),
+        )
+        .where(Page.url == url)
+        .order_by(Link.position)
+    )
+    return [FoundLink(url=t, text=x, nofollow=n) for t, x, n in rows]
+
+
+def sweep_unreached(session: Session, crawl_id: uuid.UUID, site_key: str, when: datetime) -> int:
+    """After a full crawl: the site's active pages it never reached are removed.
+
+    "Never reached" means no row at all in this crawl. A page that failed
+    (a 503, the dead-letter queue) was reached and stays active: it may only
+    be down for a while. Returns how many pages were marked.
+    """
+    reached = select(CrawlUrl.url).where(CrawlUrl.crawl_id == crawl_id, CrawlUrl.url == Page.url)
+    result = session.execute(
+        update(Page)
+        .where(Page.site_key == site_key, Page.status == "active", ~reached.exists())
+        .values(status="removed", removed_at=when)
+        .execution_options(synchronize_session=False)
+    )
+    return int(getattr(result, "rowcount", 0))
