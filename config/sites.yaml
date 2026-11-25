@@ -30,6 +30,8 @@ sites:
     max_depth: 60          # listing pages chain through 50 "next" links
     max_pages: 300
     requests_per_second: 2
+    remove:
+      - .alert-warning        # "This is a demo website" banner on every page
     fields:
       price: {selector: "article.product_page p.price_color"}
       availability: {selector: "article.product_page p.availability"}
@@ -60,6 +62,16 @@ sites:
     max_depth: 2           # author -> work -> edition
     max_pages: 150
     requests_per_second: 0.1   # robots.txt Crawl-delay: 10
+    # The page <h1> is the site logo; the entity name is this <h2>.
+    title_selector: .top-section h2
+    # App chrome, not bibliographic content.
+    remove:
+      - .large-screen-actions   # edit / history menus
+      - .type-label             # "Work", "Author": kept in the entity_type field
+      - .flash                  # app messages such as "invalid user:"
+      - .filters                # edition filters and counters
+      - .filters-wrapper
+      - .items-lists-section    # users' personal inventories
     # From rendered pages (tests/fixtures/inventaire). Svelte adds generated
     # classes such as "svelte-vpir1l" that change on every deploy; these
     # selectors use only the stable, meaningful class names.

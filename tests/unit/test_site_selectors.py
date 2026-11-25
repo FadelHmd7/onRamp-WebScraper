@@ -86,3 +86,16 @@ def test_inventaire_values_from_rendered_pages() -> None:
     assert text(author, "entity_type") == "Author"
     assert text(author, "birth_year") == "1775"
     assert text(author, "death_year") == "1817"
+
+
+CLEANING_CASES = [
+    (key, selector)
+    for key, site in SITES.items()
+    for selector in [*site.remove, *([site.title_selector] if site.title_selector else [])]
+]
+
+
+@pytest.mark.parametrize(("site", "selector"), CLEANING_CASES)
+def test_cleaning_selector_matches_a_saved_page(site: str, selector: str) -> None:
+    """Every remove / title selector does something on a real page; none is dead config."""
+    assert any(soup.select(selector) for soup in pages(site)), f"{site}: {selector}"

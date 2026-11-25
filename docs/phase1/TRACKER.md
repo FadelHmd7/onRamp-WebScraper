@@ -13,8 +13,8 @@ Spec: `docs/phase1/SPEC.md`. Stack: `docs/DECISIONS.md`.
 
 | | |
 | --- | --- |
-| Current | **D1** — Data model and migrations (waiting for your commit) |
-| Next | **D2** — HTML cleaning into structured blocks |
+| Current | **D2** — HTML cleaning (waiting for your commit) |
+| Next | **D3** — Tables as rows and columns |
 
 Status values: `todo`, `doing`, `done`.
 
@@ -61,8 +61,8 @@ After F3: push `main`, then create and push `phase-1`.
 
 | ID | Task | Done when | Status |
 | --- | --- | --- | --- |
-| D1 | Data model and Alembic migrations: `sites`, `crawls`, `pages`, `fetches` (raw HTML, status, time, headers), `document_versions` (blocks JSONB, fields, hash, `tsvector`), `links`, `dead_letters`, `users`. A `migrate` service runs on start | Migrations apply on an empty database in compose; migration matches models; GIN full-text index used; design in `DATA_MODEL.md` | doing |
-| D2 | Cleaning: drop scripts, styles, nav, footer, ads; keep title, headings, paragraphs, lists, tables as ordered blocks | **Required test area 4** passes on fixtures from all three sites | todo |
+| D1 | Data model and Alembic migrations: `sites`, `crawls`, `pages`, `fetches` (raw HTML, status, time, headers), `document_versions` (blocks JSONB, fields, hash, `tsvector`), `links`, `dead_letters`, `users`. A `migrate` service runs on start | Migrations apply on an empty database in compose; migration matches models; GIN full-text index used; design in `DATA_MODEL.md` | done |
+| D2 | Cleaning: drop scripts, styles, nav, footer, ads; keep title, headings, paragraphs, lists, tables as ordered blocks | **Required test area 4** passes on fixtures from all three sites (23 tests); every cleaning selector matches a saved page | doing |
 | D3 | Tables stored as header plus rows and columns (extra content type) | Fixture table round-trips with the same cells | todo |
 | D4 | Pydantic document schema; invalid documents rejected with a logged reason | Tests for a valid document and each rejection reason | todo |
 | D5 | Site-specific fields from selectors in `sites.yaml` (for example price, code) | Fixture tests per site | todo |

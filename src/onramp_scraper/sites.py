@@ -61,6 +61,9 @@ class SiteConfig(BaseModel):
     max_pages: int = Field(ge=1)
     requests_per_second: float = Field(gt=0)
     fields: dict[str, FieldRule] = {}
+    # Cleaning (processing/clean.py). All optional; the generic rules cover most pages.
+    title_selector: str | None = None  # where the page title is, if not the first <h1>
+    remove: list[str] = []  # extra clutter to drop, as CSS selectors
 
     @field_validator("include", "exclude")
     @classmethod
