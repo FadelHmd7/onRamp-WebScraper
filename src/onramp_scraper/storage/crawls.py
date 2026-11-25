@@ -11,9 +11,10 @@ retries; also in the dead-letter queue).
 """
 
 import uuid
+from dataclasses import dataclass
 from datetime import UTC, datetime
 
-from sqlalchemy import select
+from sqlalchemy import func, select, update
 from sqlalchemy.dialects.postgresql import insert
 from sqlalchemy.orm import Session
 
@@ -85,4 +86,87 @@ def set_url_status(
         insert(CrawlUrl)
         .values(crawl_id=crawl_id, url=url, depth=depth, **values)
         .on_conflict_do_update(index_elements=[CrawlUrl.crawl_id, CrawlUrl.url], set_=values)
+    )
+
+
+STATUSES = ("queued", "fetched", "unchanged", "skipped", "failed", "dead")
+
+
+@dataclass(frozen=True)
+class CrawlProgress:
+    """A crawl's state and its URL counts by status, straight from the database."""
+
+    crawl_id: uuid.UUID
+    site_key: str
+    mode: str
+    status: str
+    created_at: datetime
+    started_at: datetime | None
+    finished_at: datetime | None
+    counts: dict[str, int]
+
+    @property
+    def total(self) -> int:
+        return sum(self.counts.values())
+
+    @property
+    def done(self) -> int:
+        return self.total - self.counts["queued"]
+
+    @property
+    def errors(self) -> int:
+        return self.counts["failed"] + self.counts["dead"]
+
+
+def progress(session: Session, crawl_id: uuid.UUID) -> CrawlProgress | None:
+    crawl = session.get(Crawl, crawl_id)
+    if crawl is None:
+        return None
+    counts = dict.fromkeys(STATUSES, 0)
+    rows = session.execute(
+        select(CrawlUrl.status, func.count())
+        .where(CrawlUrl.crawl_id == crawl_id)
+        .group_by(CrawlUrl.status)
+    )
+    for status, count in rows:
+        counts[status] = count
+    return CrawlProgress(
+        crawl_id=crawl.id,
+        site_key=crawl.site_key,
+        mode=crawl.mode,
+        status=crawl.status,
+        created_at=crawl.created_at,
+        started_at=crawl.started_at,
+        finished_at=crawl.finished_at,
+        counts=counts,
+    )
+
+
+def finish_if_done(session: Session, crawl_id: uuid.UUID) -> bool:
+    """Mark the crawl finished when no URL is queued. True only for the call that did it.
+
+    Called after a job commits its final status. A job records its children
+    before it marks itself final, so "nothing queued" means nothing is left.
+    """
+    queued = session.scalar(
+        select(func.count())
+        .select_from(CrawlUrl)
+        .where(CrawlUrl.crawl_id == crawl_id, CrawlUrl.status == "queued")
+    )
+    if queued:
+        return False
+    result = session.execute(
+        update(Crawl)
+        .where(Crawl.id == crawl_id, Crawl.status == "running")
+        .values(status="finished", finished_at=datetime.now(UTC))
+    )
+    return bool(getattr(result, "rowcount", 0))
+
+
+def reopen(session: Session, crawl_id: uuid.UUID) -> None:
+    """A finished crawl runs again when one of its URLs is queued again (dead-letter retry)."""
+    session.execute(
+        update(Crawl)
+        .where(Crawl.id == crawl_id, Crawl.status == "finished")
+        .values(status="running", finished_at=None)
     )

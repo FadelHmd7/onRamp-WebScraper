@@ -115,6 +115,9 @@ def process(job: Job, ctx: CrawlContext, redelivered: bool = False) -> JobResult
             attempts=job.attempt,
             error=handled.reason if handled.status in ("failed", "skipped") else None,
         )
+    with ctx.sessions.begin() as session:  # after the commit above, so it sees this URL done
+        if crawls.finish_if_done(session, crawl_id):
+            log.info("crawl %s finished", crawl_id)
     log.info("%s %s (%s) +%d links", handled.status, job.url, handled.reason, len(sent))
     return JobResult(handled.status, handled.reason, sent)
 
