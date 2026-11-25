@@ -67,3 +67,30 @@ It writes `docs/phase1/benchmark/results.csv` and `chart.svg`.
 - Windows 11 laptop, Docker Desktop virtual machine with 4 CPUs and 10 GB of memory.
 - Test site latency `TESTSITE_LATENCY_MS=50`.
 - One Celery process per worker container, with prefetch 1.
+
+## Bonus: autoscaling from the queue
+
+`docker compose --profile autoscale up -d` adds an `autoscaler` container. Every 5 seconds it reads the crawl queue's backlog from RabbitMQ's management API and sets the number of worker containers. The backlog is jobs waiting plus jobs in hand.
+
+**The rules** (`src/onramp_scraper/autoscaler/policy.py`):
+- **The target:** one worker per 25 jobs of backlog, between 1 and 8.
+- **Up at once:** a growing queue is waiting time for every page in it.
+- **Down one worker at a time:** only after 30 s of low backlog. Crawls arrive in bursts (each page adds about 20 links), and scaling down on every dip would stop and start containers for nothing.
+
+**How it scales:**
+- **New workers:** a copy of a running one is created through the Docker socket, with the same image, environment, network and Compose labels, so `docker compose ps` still shows them as the `worker` service.
+- **Removed workers:** a normal stop, so a worker finishes its current job first. `acks_late` covers anything unfinished.
+
+**Measured:** a full crawl started with one worker and the autoscaler running.
+
+| Time | Backlog | Workers | What happened |
+| ---: | ---: | ---: | --- |
+| 0 s | 0 | 1 | crawl started |
+| 9 s | 49 | 2 | scaled up |
+| 25 s | 148 | 5 | three started in one step |
+| 49 s | 195 | 8 | at the maximum |
+| 103 s | 0 | 8 | queue drained; all 630 pages done, none failed |
+| 115 s | 0 | 7 | first step down, after the 30 s cooldown |
+| 321 s | 0 | 1 | one worker removed about every 35 s, back to the minimum |
+
+The autoscaler needs the Docker socket, which gives full control of Docker on the machine. So it is off by default and meant for local use only.

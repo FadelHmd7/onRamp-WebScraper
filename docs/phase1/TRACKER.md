@@ -13,8 +13,8 @@ Spec: `docs/phase1/SPEC.md`. Stack: `docs/DECISIONS.md`.
 
 | | |
 | --- | --- |
-| Current | **W8** — Autoscaler (bonus) |
-| Next | M6 — API (**A1**) |
+| Current | M5 done; **A1** next (waiting for your go-ahead) |
+| Next | M6 — API: A1 to A8 |
 
 Status values: `todo`, `doing`, `done`.
 
@@ -80,7 +80,7 @@ After F3: push `main`, then create and push `phase-1`.
 | W5 | Incremental re-crawl (conditional requests, only changed pages versioned) and removal marking (404/410, or not reached by a full crawl) | Editing a `testsite` page gives exactly one new version; deleting one marks it removed. Verified in compose: incremental re-crawl after editing `pricing` = 633 × 304 (no body) + 1 × 200, `pricing` at version 2; 404/410 and unreached pages marked removed with versions kept (not after custom seeds or a spent budget) | done |
 | W6 | Failure demo scripts in `scripts/demo/`: kill mid-task, timeout, 429, always-fail | Each script prints the expected outcome. All four PASS against the compose stack (`run_all.py`); the kill demo found that a killed container sometimes never closes its RabbitMQ connection, fixed with `broker_heartbeat=5` (takeover 5-12 s in 3 runs) | done |
 | W7 | Benchmark: the same 500+ `testsite` pages with 1, 2 and 4 workers; results CSV and chart | Chart saved in `docs/phase1/` with a short analysis. `BENCHMARK.md`: 396 / 674 / 1,083 / 1,273 pages per minute with 1 / 2 / 4 / 8 workers (median of 3); the 4-CPU machine is the limit, and on real sites the per-domain rate limit is | done |
-| W8 | Bonus: `autoscaler` container scales `worker` from queue depth | Queue grows → workers increase; queue drains → workers decrease | todo |
+| W8 | Bonus: `autoscaler` container scales `worker` from queue depth | Queue grows → workers increase; queue drains → workers decrease. Verified: 1 → 8 workers within 49 s as the backlog reached 195, then back to 1, one every ~35 s, after the queue drained; the crawl finished 630/630 | done |
 
 ## M6 — API (Task 5, 10 pts)
 

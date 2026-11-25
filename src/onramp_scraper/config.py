@@ -23,6 +23,8 @@ class Settings(BaseSettings):
     database_url: str = "postgresql://scraper:scraper@postgres:5432/scraper"
     redis_url: str = "redis://redis:6379/0"
     broker_url: str = "amqp://scraper:scraper@rabbitmq:5672//"
+    # RabbitMQ's management API, for queue depth (same credentials as BROKER_URL).
+    rabbitmq_api_url: str = "http://rabbitmq:15672"
 
     # Per-site crawl rules (seeds, limits, fetch mode, selectors).
     sites_file: Path = Path("config/sites.yaml")
@@ -41,6 +43,14 @@ class Settings(BaseSettings):
     # expires after the TTL, so "active workers" drops within the TTL.
     heartbeat_ttl: float = Field(default=15.0, gt=0)
     heartbeat_interval: float = Field(default=5.0, gt=0)
+
+    # Autoscaler (bonus, `docker compose --profile autoscale up`): see autoscaler/policy.py.
+    compose_project: str = "onramp-scraper"  # used only if it cannot read its own labels
+    autoscale_min: int = Field(default=1, ge=1)
+    autoscale_max: int = Field(default=8, ge=1)
+    autoscale_jobs_per_worker: int = Field(default=25, ge=1)
+    autoscale_cooldown: float = Field(default=30.0, ge=0)
+    autoscale_interval: float = Field(default=5.0, gt=0)
 
 
 @lru_cache

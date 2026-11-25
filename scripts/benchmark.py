@@ -177,10 +177,10 @@ def main() -> int:
 
     OUT.mkdir(parents=True, exist_ok=True)
     with (OUT / "results.csv").open("w", newline="", encoding="utf-8") as handle:
-        writer = csv.DictWriter(handle, fieldnames=list(rows[0]))
+        writer = csv.DictWriter(handle, fieldnames=list(rows[0]), lineterminator="\n")
         writer.writeheader()
         writer.writerows(rows)
-    (OUT / "chart.svg").write_text(chart(rows), encoding="utf-8")
+    (OUT / "chart.svg").write_text(chart(rows), encoding="utf-8", newline="\n")
     demo.step(f"wrote {OUT / 'results.csv'} and {OUT / 'chart.svg'}")
     incomplete = [r for r in rows if r["status"] != "finished" or r["pages"] != PAGES]
     return 1 if incomplete else 0
