@@ -13,8 +13,8 @@ Spec: `docs/phase1/SPEC.md`. Stack: `docs/DECISIONS.md`.
 
 | | |
 | --- | --- |
-| Current | **U5** — Document page |
-| Next | M8 — Real crawls and deliverables |
+| Current | M7 done; **H1** next (waiting for your go-ahead) |
+| Next | M8 — Real crawls and deliverables: H1 to H6 |
 
 Status values: `todo`, `doing`, `done`.
 
@@ -103,7 +103,7 @@ After F3: push `main`, then create and push `phase-1`.
 | U2 | Login; navigation and actions differ for admin and viewer | Viewer never sees admin actions: `<AdminOnly>` renders nothing for a viewer (tested for both roles; the dashboard's admin actions in U3 use it). Login, session kept across reloads, sign out, and an expired token sends you back to login; checked in Chromium on desktop and phone width | done |
 | U3 | Dashboard polling every few seconds: crawl progress, queue length, active workers, errors. Admin: start crawl, retry dead-letter jobs | Numbers move during a crawl. Seen in Chromium during a live crawl: queue 45 → 116, four workers with their current URLs, progress bars and per-crawl errors; polling every 3 s, paused in a hidden tab. Admin: start crawl (sites from the new `GET /sites`) and dead-letter retry; a viewer gets neither and never calls `/dlq` | done |
 | U4 | Search page with snippets and a site filter | Highlighted results, filter works. Seen in Chromium: 446 results for "distributed systems" over 23 pages with `<mark>` highlights; query, site and page live in the URL; snippets are rendered without `innerHTML` (only text and `<mark>`, tested with hostile input); no query browses newest documents | done |
-| U5 | Document page: cleaned blocks (tables included), source URL, version history | Multi-version document shows every version | todo |
+| U5 | Document page: cleaned blocks (tables included), source URL, version history | Multi-version document shows every version. Seen in Chromium on a page edited twice: versions 3, 2, 1 with time and hash; `?v=2` shows that version and what changed since version 1 (removed, then added); blocks rendered as headings, lists, tables with row headers, code and quotes; raw HTML shown as text | done |
 
 ## M8 — Real crawls and deliverables (15 pts + release)
 

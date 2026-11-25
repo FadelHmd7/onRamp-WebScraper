@@ -3,6 +3,7 @@ import { NavLink, Route, Routes } from "react-router";
 import { AuthProvider, RequireAuth, useAuth } from "./auth";
 import { HealthBadge } from "./components/HealthBadge";
 import { Dashboard } from "./pages/Dashboard";
+import { DocumentPage } from "./pages/Document";
 import { Login } from "./pages/Login";
 import { Search } from "./pages/Search";
 
@@ -49,6 +50,7 @@ function Shell() {
         <Routes>
           <Route path="/" element={<Dashboard />} />
           <Route path="/search" element={<Search />} />
+          <Route path="/documents/:id" element={<DocumentPage />} />
           <Route path="*" element={<NotFound />} />
         </Routes>
       </main>

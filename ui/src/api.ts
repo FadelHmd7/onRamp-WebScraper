@@ -157,6 +157,27 @@ export interface VersionHistory {
   versions: VersionSummary[];
 }
 
+export interface FetchSummary {
+  id: number;
+  crawl_id: string;
+  fetched_at: string;
+  status_code: number | null;
+  outcome: string;
+}
+
+export interface RawPage {
+  page_id: number;
+  url: string;
+  site: string;
+  status: string;
+  fetch: FetchSummary;
+  elapsed_ms: number;
+  headers: Record<string, string>;
+  error: string | null;
+  html: string | null;
+  history: FetchSummary[];
+}
+
 export class ApiError extends Error {
   readonly status: number;
 
@@ -264,6 +285,7 @@ export const api = {
   documents: (query: Query = {}) => request<Page<DocumentSummary>>("/documents", { query }),
   document: (id: number) => request<DocumentDetail>(`/documents/${id}`),
   versions: (id: number) => request<VersionHistory>(`/documents/${id}/versions`),
+  raw: (pageId: number) => request<RawPage>(`/pages/${pageId}/raw`),
   version: (id: number, version: number) =>
     request<Version>(`/documents/${id}/versions/${version}`),
 };

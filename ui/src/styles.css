@@ -294,3 +294,66 @@ blockquote {
   display: grid;
   gap: 0.8rem;
 }
+
+/* ---------------------------------------------------------------- document page */
+
+.doc-layout {
+  display: grid;
+  gap: 1rem;
+  grid-template-columns: minmax(0, 1fr) 240px;
+  align-items: start;
+}
+
+@media (max-width: 760px) {
+  .doc-layout {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
+.versions ol {
+  margin: 0;
+  padding-left: 1.2rem;
+  display: grid;
+  gap: 0.6rem;
+}
+
+.versions button {
+  width: 100%;
+  text-align: left;
+}
+
+.blocks > :first-child {
+  margin-top: 0;
+}
+
+.content-table {
+  margin: 0.5rem 0;
+}
+
+.content-table caption {
+  text-align: left;
+  color: var(--muted);
+  padding-bottom: 0.25rem;
+}
+
+.changes {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  display: grid;
+  gap: 0.4rem;
+}
+
+.changes li.removed {
+  text-decoration: line-through;
+  color: var(--muted);
+}
+
+.raw {
+  max-height: 420px;
+  overflow: auto;
+}
+
+.snippet {
+  margin: 0.4rem 0;
+}
