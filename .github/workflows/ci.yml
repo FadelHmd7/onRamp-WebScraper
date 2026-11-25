@@ -89,6 +89,10 @@ jobs:
           curl -fsS http://localhost:9070/api/health
           curl -fsS http://localhost:9050/robots.txt
           curl -fsS -o /dev/null http://localhost:9050/items/1
+          # The migrate service applied the schema and synced the sites.
+          sites=$(docker compose exec -T postgres psql -U scraper -d scraper -tAc "select count(*) from sites")
+          echo "sites in database: ${sites}"
+          test "${sites}" = "4"
           # The sites config ships in the image and validates there.
           docker compose exec -T worker python -c "from onramp_scraper.sites import load_sites; print(sorted(load_sites()))"
           # The worker image can launch headless Chromium (as the non-root app user).

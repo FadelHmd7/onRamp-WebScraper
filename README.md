@@ -11,6 +11,7 @@ A distributed, fault-tolerant web crawler for the onRamp bootcamp. Phase 1 crawl
 - [docs/DECISIONS.md](docs/DECISIONS.md) — chosen stack, each with the alternative we rejected
 - [docs/phase1/SITES.md](docs/phase1/SITES.md) — theme, the three sites, and the candidates we rejected
 - [docs/phase1/COMPLIANCE.md](docs/phase1/COMPLIANCE.md) — robots.txt, terms and rate limits per site
+- [docs/phase1/DATA_MODEL.md](docs/phase1/DATA_MODEL.md) — database tables, versioning and the full-text index
 - [config/sites.yaml](config/sites.yaml) — per-site crawl rules: seeds, limits, fetch mode, rate, selectors
 
 ## Stack
@@ -51,7 +52,7 @@ Needs Docker with Compose v2. From a clean checkout:
 docker compose up --build
 ```
 
-No `.env` file is needed to start: every setting has a default. Before crawling real sites, copy `.env.example` to `.env` and put a real contact address in `USER_AGENT`.
+No `.env` file is needed to start: every setting has a default. A one-shot `migrate` service applies the database schema and syncs `config/sites.yaml` first; the API and workers start after it succeeds. Before crawling real sites, copy `.env.example` to `.env` and put a real contact address in `USER_AGENT`.
 
 | Service | URL |
 | --- | --- |

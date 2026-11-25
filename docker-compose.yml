@@ -71,6 +71,19 @@ services:
       retries: 10
     restart: unless-stopped
 
+  # Applies database migrations and syncs config/sites.yaml, then exits.
+  # The API and workers start only after it succeeds.
+  migrate:
+    build:
+      context: .
+      target: api
+    command: ["python", "-m", "onramp_scraper.storage.migrate"]
+    environment: *app-env
+    depends_on:
+      postgres:
+        condition: service_healthy
+    restart: "no"
+
   api:
     build:
       context: .
@@ -78,7 +91,10 @@ services:
     environment: *app-env
     ports:
       - "${API_PORT:-9060}:8000"
-    depends_on: *backing-services
+    depends_on:
+      <<: *backing-services
+      migrate:
+        condition: service_completed_successfully
     restart: unless-stopped
 
   # No container_name and no published port, so `--scale worker=N` works.
@@ -89,7 +105,10 @@ services:
       context: .
       target: worker
     environment: *app-env
-    depends_on: *backing-services
+    depends_on:
+      <<: *backing-services
+      migrate:
+        condition: service_completed_successfully
     restart: unless-stopped
     # Give a running job time to finish on `docker compose stop`.
     # `docker kill` skips this, which is the crash demo.
