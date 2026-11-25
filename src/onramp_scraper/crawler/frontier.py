@@ -131,6 +131,22 @@ class Frontier:
         seeds = [u for s in site.seeds if (u := normalize_url(str(s))) is not None]
         return self.offer(crawl_id, site, [u for u in seeds if in_scope(site, u, 0)])
 
+    @staticmethod
+    def candidates(
+        site: SiteConfig, links: list[Link], depth: int, follow: bool = True
+    ) -> list[str]:
+        """The links on a page at ``depth`` that qualify for depth + 1, in page order.
+
+        ``follow`` is False when the page's meta robots says nofollow.
+        """
+        if not follow or depth + 1 > site.max_depth:
+            return []
+        found: list[str] = []
+        for link in links:
+            if not link.nofollow and link.url not in found and in_scope(site, link.url, depth + 1):
+                found.append(link.url)
+        return found
+
     def discover(
         self,
         crawl_id: str,
@@ -139,21 +155,15 @@ class Frontier:
         depth: int,
         follow: bool = True,
     ) -> list[str]:
-        """The links found on a page at ``depth`` that should be crawled next (at depth + 1).
+        """The links found on a page at ``depth`` that should be crawled next (at depth + 1)."""
+        return self.offer(crawl_id, site, self.candidates(site, links, depth, follow))
 
-        ``follow`` is False when the page's meta robots says nofollow.
-        """
-        if not follow or depth + 1 > site.max_depth:
+    def seen_many(self, crawl_id: str, urls: list[str]) -> list[str]:
+        """The URLs already accepted in this crawl, by any worker."""
+        if not urls:
             return []
-        candidates: list[str] = []
-        for link in links:
-            if (
-                not link.nofollow
-                and link.url not in candidates
-                and in_scope(site, link.url, depth + 1)
-            ):
-                candidates.append(link.url)
-        return self.offer(crawl_id, site, candidates)
+        flags = self.redis.smismember(self._keys(crawl_id)[0], urls)
+        return [url for url, flag in zip(urls, flags, strict=True) if flag]
 
     def accepted_count(self, crawl_id: str) -> int:
         raw = self.redis.get(self._keys(crawl_id)[1])

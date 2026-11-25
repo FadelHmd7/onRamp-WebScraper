@@ -13,8 +13,8 @@ Spec: `docs/phase1/SPEC.md`. Stack: `docs/DECISIONS.md`.
 
 | | |
 | --- | --- |
-| Current | M4 done; **W1** next (waiting for your go-ahead) |
-| Next | **W1** — Celery crawl task, then W2–W8 |
+| Current | **W2** — Crawl runs |
+| Next | **W3** — Retries and dead-letter queue |
 
 Status values: `todo`, `doing`, `done`.
 
@@ -73,7 +73,7 @@ After F3: push `main`, then create and push `phase-1`.
 
 | ID | Task | Done when | Status |
 | --- | --- | --- | --- |
-| W1 | Celery app on RabbitMQ: `crawl_page` task (fetch → clean → validate → store → enqueue links), `acks_late`, `reject_on_worker_lost`, prefetch 1, concurrency 1 | Crawl of `testsite` with 4 workers stores every page once | todo |
+| W1 | Celery app on RabbitMQ: `crawl_page` task (fetch → clean → validate → store → enqueue links), `acks_late`, `reject_on_worker_lost`, prefetch 1, concurrency 1 | Crawl of `testsite` with 4 workers stores every page once. Verified: 4 Celery containers stored all 630 pages once in about 25 s (157/161/157/155 per worker); integration test with 4 worker threads; a redelivered job re-sends links its crashed run accepted | done |
 | W2 | Crawl runs: create a crawl, enqueue seeds, count queued, done, failed and skipped pages, mark the run finished | Progress counts match the database after a run | todo |
 | W3 | Retries: exponential backoff with jitter, honour `Retry-After`, max N attempts, then a dead-letter row (URL, last error, attempts); re-enqueue from the dead-letter queue | `/flaky` succeeds after retries, `/always-500` lands in the dead-letter queue, `/429` waits as asked | todo |
 | W4 | Worker heartbeats in Redis (TTL keys), used for "active workers" | Killing a worker drops the count within the TTL | todo |
