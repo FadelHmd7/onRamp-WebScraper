@@ -7,6 +7,7 @@ Normal pages
     /js/items/{id}          same item, but the content is rendered by JavaScript
     /editable/{slug}        pages that /_admin can change or delete (versioning demo)
     /private/...            disallowed by robots.txt
+    /whoami                 echoes the User-Agent the crawler sent
 
 Failure modes (all counters are per id, reset with POST /_admin/reset)
     /slow/{id}?delay=S              answers after S seconds (timeout demo)
@@ -173,6 +174,13 @@ async def js_item_page(request: Request, item_id: int) -> Response:
         }});
     </script>"""
     return html_page(request, content.layout("Loading", body), SITE_EPOCH)
+
+
+@app.get("/whoami")
+def whoami(request: Request) -> HTMLResponse:
+    """Echoes the caller's User-Agent, to check what a crawler really sends."""
+    agent = escape(request.headers.get("user-agent", ""))
+    return HTMLResponse(content.layout("Who am I", f'    <p id="user-agent">{agent}</p>'))
 
 
 @app.get("/private/{path:path}")

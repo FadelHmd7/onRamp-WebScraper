@@ -21,12 +21,15 @@ from collections.abc import Callable
 from dataclasses import dataclass, field
 from datetime import UTC, datetime
 from enum import StrEnum
+from typing import Protocol
 
 import httpx
 
+from onramp_scraper.config import get_settings
 from onramp_scraper.crawler.ratelimit import RateLimiter, effective_rate
 from onramp_scraper.crawler.robots import RobotsChecker, RobotsFile, http_fetch_robots
 from onramp_scraper.crawler.urls import host_of, normalize_url
+from onramp_scraper.sites import SiteConfig
 
 CONNECT_TIMEOUT = 10.0
 READ_TIMEOUT = 30.0
@@ -87,6 +90,49 @@ def parse_retry_after(value: str | None, now: datetime | None = None) -> float |
     return min(max(seconds, 0.0), MAX_RETRY_AFTER)
 
 
+def classify_status(
+    url: str, status: int, headers: dict[str, str], elapsed_ms: int
+) -> FetchResult | None:
+    """The outcome for every status except success; ``None`` means "2xx, read the page".
+
+    Shared by the HTTP and browser fetchers, so both follow the same rules.
+    ``headers`` must have lowercase names.
+    """
+
+    def result(
+        outcome: Outcome,
+        error: str | None = None,
+        retry_after: float | None = None,
+        location: str | None = None,
+    ) -> FetchResult:
+        return FetchResult(
+            url=url,
+            outcome=outcome,
+            status=status,
+            headers=headers,
+            error=error,
+            retry_after=retry_after,
+            location=location,
+            elapsed_ms=elapsed_ms,
+        )
+
+    if status == 304:
+        return result(Outcome.NOT_MODIFIED)
+    if 300 <= status < 400:
+        raw_location = headers.get("location", "").strip()
+        # An empty Location would resolve to this same page: a redirect loop.
+        location = normalize_url(raw_location, base=url) if raw_location else None
+        if location is None or location == normalize_url(url):
+            return result(Outcome.PERMANENT, error=f"redirect {status} without a usable Location")
+        return result(Outcome.REDIRECT, location=location)
+    if status in RETRYABLE_STATUS:
+        retry_after = parse_retry_after(headers.get("retry-after"))
+        return result(Outcome.RETRY, error=f"HTTP {status}", retry_after=retry_after)
+    if not 200 <= status < 300:
+        return result(Outcome.PERMANENT, error=f"HTTP {status}")
+    return None
+
+
 class HttpFetcher:
     """One request, one classified result."""
 
@@ -124,57 +170,40 @@ class HttpFetcher:
     def _classify(self, url: str, response: httpx.Response, started: float) -> FetchResult:
         status = response.status_code
         headers = {name.lower(): value for name, value in response.headers.items()}
+        early = classify_status(url, status, headers, _ms(started))
+        if early is not None:
+            return early
 
-        def result(
-            outcome: Outcome,
-            *,
-            body: str | None = None,
-            error: str | None = None,
-            retry_after: float | None = None,
-            location: str | None = None,
-        ) -> FetchResult:
+        def failed(error: str) -> FetchResult:
             return FetchResult(
                 url=url,
-                outcome=outcome,
+                outcome=Outcome.PERMANENT,
                 status=status,
                 headers=headers,
-                body=body,
                 error=error,
-                retry_after=retry_after,
-                location=location,
                 elapsed_ms=_ms(started),
             )
 
-        if status == 304:
-            return result(Outcome.NOT_MODIFIED)
-        if 300 <= status < 400:
-            raw_location = headers.get("location", "").strip()
-            # An empty Location would resolve to this same page: a redirect loop.
-            location = normalize_url(raw_location, base=url) if raw_location else None
-            if location is None or location == normalize_url(url):
-                return result(
-                    Outcome.PERMANENT, error=f"redirect {status} without a usable Location"
-                )
-            return result(Outcome.REDIRECT, location=location)
-        if status in RETRYABLE_STATUS:
-            retry_after = parse_retry_after(headers.get("retry-after"))
-            return result(Outcome.RETRY, error=f"HTTP {status}", retry_after=retry_after)
-        if not 200 <= status < 300:
-            return result(Outcome.PERMANENT, error=f"HTTP {status}")
-
         content_type = headers.get("content-type", "").split(";")[0].strip().lower()
         if content_type and content_type not in HTML_TYPES:
-            return result(Outcome.PERMANENT, error=f"not HTML: {content_type}")
+            return failed(f"not HTML: {content_type}")
 
         chunks: list[bytes] = []
         size = 0
         for chunk in response.iter_bytes():
             size += len(chunk)
             if size > MAX_BODY_BYTES:
-                return result(Outcome.PERMANENT, error=f"page larger than {MAX_BODY_BYTES} bytes")
+                return failed(f"page larger than {MAX_BODY_BYTES} bytes")
             chunks.append(chunk)
         body = b"".join(chunks).decode(response.encoding or "utf-8", errors="replace")
-        return result(Outcome.OK, body=body)
+        return FetchResult(
+            url=url,
+            outcome=Outcome.OK,
+            status=status,
+            headers=headers,
+            body=body,
+            elapsed_ms=_ms(started),
+        )
 
     @staticmethod
     def _failed(url: str, outcome: Outcome, error: str, started: float) -> FetchResult:
@@ -185,23 +214,50 @@ def _ms(started: float) -> int:
     return round((time.monotonic() - started) * 1000)
 
 
+class BrowserFetch(Protocol):
+    """What PoliteFetcher needs from a browser fetcher (see crawler/browser.py)."""
+
+    def fetch(self, url: str, wait_until: str, wait_for: str | None) -> FetchResult: ...
+
+
+def _default_browser() -> BrowserFetch:
+    # Imported here so images without Playwright (the API) never import it.
+    from onramp_scraper.crawler.browser import BrowserFetcher
+
+    return BrowserFetcher(get_settings().user_agent)
+
+
 class PoliteFetcher:
-    """robots.txt check, then a shared rate-limit slot, then the request."""
+    """robots.txt check, then a shared rate-limit slot, then HTTP or a browser.
+
+    The site's ``fetch_mode`` decides which. The browser is created on the
+    first page that needs it, so a worker crawling only static sites never
+    starts Chromium.
+    """
 
     def __init__(
         self,
         http: HttpFetcher,
         robots: RobotsChecker,
         limiter: RateLimiter,
+        browser_factory: Callable[[], BrowserFetch] = _default_browser,
     ) -> None:
         self.http = http
         self.robots = robots
         self.limiter = limiter
+        self._browser_factory = browser_factory
+        self._browser: BrowserFetch | None = None
+
+    @property
+    def browser(self) -> BrowserFetch:
+        if self._browser is None:
+            self._browser = self._browser_factory()
+        return self._browser
 
     def fetch(
         self,
         url: str,
-        requests_per_second: float,
+        site: SiteConfig,
         etag: str | None = None,
         last_modified: str | None = None,
     ) -> FetchResult:
@@ -209,9 +265,13 @@ class PoliteFetcher:
             return FetchResult(url=url, outcome=Outcome.BLOCKED, error="disallowed by robots.txt")
 
         host = host_of(url)
-        rate = effective_rate(requests_per_second, self.robots.crawl_delay(url))
+        rate = effective_rate(site.requests_per_second, self.robots.crawl_delay(url))
         self.limiter.wait(host, rate)
-        result = self.http.fetch(url, etag=etag, last_modified=last_modified)
+        if site.fetch_mode == "browser":
+            # One page load counts as one request against the limit.
+            result = self.browser.fetch(url, site.browser_wait_until, site.browser_wait_for)
+        else:
+            result = self.http.fetch(url, etag=etag, last_modified=last_modified)
 
         if result.status in (429, 503) and result.retry_after:
             self.limiter.pause(host, result.retry_after)

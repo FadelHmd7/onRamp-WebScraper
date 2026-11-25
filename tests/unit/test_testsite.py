@@ -96,3 +96,8 @@ def test_reset_restores_state(client: TestClient) -> None:
     client.post("/_admin/reset")
     assert client.get("/flaky/1?fail=1").status_code == 503
     assert client.get("/editable/team").status_code == 200
+
+
+def test_whoami_echoes_user_agent(client: TestClient) -> None:
+    html = client.get("/whoami", headers={"User-Agent": "probe/1.0"}).text
+    assert '<p id="user-agent">probe/1.0</p>' in html

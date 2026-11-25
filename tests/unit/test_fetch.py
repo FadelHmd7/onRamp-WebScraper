@@ -18,6 +18,7 @@ from onramp_scraper.crawler.fetch import (
 )
 from onramp_scraper.crawler.ratelimit import RateLimiter
 from onramp_scraper.crawler.robots import RobotsChecker, RobotsFile
+from onramp_scraper.sites import SiteConfig
 
 FIXTURES = Path(__file__).parents[1] / "fixtures"
 UA = "onRamp-WebScraper/0.1 (test)"
@@ -210,6 +211,25 @@ def polite(handler: Handler, robots: RobotsFile) -> tuple[PoliteFetcher, Recordi
 INVENTAIRE_ROBOTS = RobotsFile(200, (FIXTURES / "inventaire" / "robots.txt").read_text("utf-8"))
 
 
+def site(host: str, rate: float = 1.0, **overrides: object) -> SiteConfig:
+    return SiteConfig.model_validate(
+        {
+            "key": "demo",
+            "name": "Demo",
+            "role": "static",
+            "base_url": f"https://{host}/",
+            "allowed_hosts": [host],
+            "fetch_mode": "http",
+            "seeds": [f"https://{host}/"],
+            "include": ["."],
+            "max_depth": 1,
+            "max_pages": 10,
+            "requests_per_second": rate,
+            **overrides,
+        }
+    )
+
+
 def test_robots_disallowed_url_is_never_requested() -> None:
     calls: list[str] = []
 
@@ -218,7 +238,7 @@ def test_robots_disallowed_url_is_never_requested() -> None:
         return httpx.Response(200, headers=HTML, text="x")
 
     polite_fetcher, limiter = polite(handler, INVENTAIRE_ROBOTS)
-    result = polite_fetcher.fetch("https://inventaire.io/search?q=x", requests_per_second=1)
+    result = polite_fetcher.fetch("https://inventaire.io/search?q=x", site("inventaire.io"))
     assert result.outcome is Outcome.BLOCKED
     assert calls == []
     assert limiter.waits == []  # no slot used either
@@ -228,7 +248,7 @@ def test_crawl_delay_lowers_the_rate() -> None:
     polite_fetcher, limiter = polite(
         lambda r: httpx.Response(200, headers=HTML, text="x"), INVENTAIRE_ROBOTS
     )
-    polite_fetcher.fetch("https://inventaire.io/entity/wd:Q1", requests_per_second=1)
+    polite_fetcher.fetch("https://inventaire.io/entity/wd:Q1", site("inventaire.io"))
     assert limiter.waits == [("inventaire.io", pytest.approx(0.1))]
 
 
@@ -237,14 +257,14 @@ def test_429_pauses_the_whole_host() -> None:
         return httpx.Response(429, headers={"Retry-After": "30"})
 
     polite_fetcher, limiter = polite(handler, RobotsFile(404))
-    result = polite_fetcher.fetch("https://a.example/x", requests_per_second=1)
+    result = polite_fetcher.fetch("https://a.example/x", site("a.example"))
     assert result.outcome is Outcome.RETRY
     assert limiter.pauses == [("a.example", 30.0)]
 
 
 def test_plain_500_does_not_pause_the_host() -> None:
     polite_fetcher, limiter = polite(lambda r: httpx.Response(500), RobotsFile(404))
-    polite_fetcher.fetch("https://a.example/x", requests_per_second=1)
+    polite_fetcher.fetch("https://a.example/x", site("a.example"))
     assert limiter.pauses == []
 
 

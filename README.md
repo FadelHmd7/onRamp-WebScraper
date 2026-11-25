@@ -22,12 +22,14 @@ Python 3.12 · Celery on RabbitMQ · Redis · PostgreSQL 16 · FastAPI · Playwr
 Needs [uv](https://docs.astral.sh/uv/). It installs Python 3.12 and every dependency from `uv.lock`.
 
 ```
-uv sync                 # create .venv from the lockfile
+uv sync --all-extras    # create .venv from the lockfile, including Playwright
 uv run ruff check .     # lint
 uv run ruff format .    # format
 uv run mypy             # type-check src/
 uv run pytest           # unit tests
 ```
+
+The browser tests need Chromium once: `uv run playwright install chromium`. Without it they are skipped.
 
 CI ([.github/workflows/ci.yml](.github/workflows/ci.yml)) runs on every push: lint and type checks, unit tests, then it builds every image, starts the stack with two workers and checks that both are consuming from the queue.
 

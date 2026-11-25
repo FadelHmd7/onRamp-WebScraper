@@ -1,6 +1,7 @@
 # Runs on every push to any branch and on pull requests:
 #   lint   — ruff (lint + format) and mypy
-#   test   — pytest, with Redis and Postgres available for integration tests
+#   test   — pytest, with Redis and Postgres for integration tests and
+#            headless Chromium for the browser tests
 #   build  — builds every image, starts the stack with 2 workers, checks it
 #
 # Actions are pinned to commit SHAs (a tag can be moved, a commit cannot).
@@ -29,7 +30,7 @@ jobs:
           version: "0.13.9"
           enable-cache: true
       - name: Install dependencies
-        run: uv sync --locked
+        run: uv sync --locked --all-extras
       - name: Ruff lint
         run: uv run ruff check --output-format=github .
       - name: Ruff format
@@ -65,9 +66,11 @@ jobs:
           version: "0.13.9"
           enable-cache: true
       - name: Install dependencies
-        run: uv sync --locked
+        run: uv sync --locked --all-extras
+      - name: Install Chromium for the browser tests
+        run: uv run playwright install --with-deps --only-shell chromium
       - name: Pytest
-        run: uv run pytest
+        run: uv run pytest -rs
 
   build:
     runs-on: ubuntu-24.04
@@ -88,6 +91,8 @@ jobs:
           curl -fsS -o /dev/null http://localhost:9050/items/1
           # The sites config ships in the image and validates there.
           docker compose exec -T worker python -c "from onramp_scraper.sites import load_sites; print(sorted(load_sites()))"
+          # The worker image can launch headless Chromium (as the non-root app user).
+          docker compose exec -T worker python -c "from playwright.sync_api import sync_playwright; p = sync_playwright().start(); b = p.chromium.launch(); print('chromium', b.version); b.close(); p.stop()"
           # Workers must reach the test site by its service name.
           docker compose exec -T worker python -c "import urllib.request; urllib.request.urlopen('http://testsite:8000/health', timeout=5)"
           # Workers connect a few seconds after their container starts.
