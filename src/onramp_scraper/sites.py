@@ -84,10 +84,13 @@ class SiteConfig(BaseModel):
             raise ValueError("fetch_mode 'browser' needs browser_wait_for")
         return self
 
+    def allows_host(self, url: str) -> bool:
+        return urlsplit(url).hostname in self.allowed_hosts
+
     def allows_path(self, url: str) -> bool:
         """Include/exclude check on path + query. robots.txt is checked elsewhere."""
         parts = urlsplit(url)
-        if parts.hostname not in self.allowed_hosts:
+        if not self.allows_host(url):
             return False
         target = parts.path + (f"?{parts.query}" if parts.query else "")
         if any(re.search(pattern, target) for pattern in self.exclude):
