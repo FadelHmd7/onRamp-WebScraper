@@ -1,5 +1,6 @@
 """HTTP fetching: every response becomes a classified result; politeness comes first."""
 
+import time
 from collections.abc import Callable
 from datetime import UTC, datetime
 from pathlib import Path
@@ -19,6 +20,7 @@ from onramp_scraper.crawler.fetch import (
 from onramp_scraper.crawler.ratelimit import RateLimiter
 from onramp_scraper.crawler.robots import RobotsChecker, RobotsFile
 from onramp_scraper.sites import SiteConfig
+from tests.unit.test_ratelimit import assert_resumes_after, slot
 
 FIXTURES = Path(__file__).parents[1] / "fixtures"
 UA = "onRamp-WebScraper/0.1 (test)"
@@ -274,16 +276,20 @@ def test_plain_500_does_not_pause_the_host() -> None:
 def test_pause_holds_back_every_worker() -> None:
     redis = fakeredis.FakeRedis()
     worker_a, worker_b = RateLimiter(redis), RateLimiter(redis)
+    before = time.perf_counter()
     worker_a.pause("a.example", 5.0)
-    assert worker_b.reserve("a.example", requests_per_second=10) == pytest.approx(5.0, abs=0.05)
+    paused = (before, time.perf_counter())
+    assert_resumes_after(paused, slot(worker_b, "a.example", 10), 5.0)
 
 
 def test_pause_never_shortens_a_longer_wait() -> None:
     redis = fakeredis.FakeRedis()
     limiter = RateLimiter(redis)
+    before = time.perf_counter()
     limiter.pause("a.example", 10.0)
-    limiter.pause("a.example", 2.0)
-    assert limiter.reserve("a.example", requests_per_second=10) == pytest.approx(10.0, abs=0.05)
+    paused = (before, time.perf_counter())
+    limiter.pause("a.example", 2.0)  # shorter: must not shorten the first pause
+    assert_resumes_after(paused, slot(limiter, "a.example", 10), 10.0)
 
 
 def test_redirect_to_itself_is_permanent() -> None:

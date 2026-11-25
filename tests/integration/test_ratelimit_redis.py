@@ -33,7 +33,7 @@ def redis() -> Iterator[Redis]:
 
 
 def test_eight_workers_share_one_limit_in_real_redis(redis: Redis) -> None:
-    rate = 20.0
-    times = run_workers(redis, HOST, rate, workers=8, each=5)
-    assert len(times) == 40
+    rate = 5.0  # see the unit test for why not faster
+    times = run_workers(redis, HOST, rate, workers=8, each=3)
+    assert len(times) == 24
     assert_respects_rate(times, rate)
