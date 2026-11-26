@@ -13,8 +13,8 @@ Spec: `docs/phase1/SPEC.md`. Stack: `docs/DECISIONS.md`.
 
 | | |
 | --- | --- |
-| Current | **H5** — your video recording |
-| Next | H6: final check, PR and tag after your go-ahead |
+| Current | **H6** — PR `phase-1` → `main` open; merge, then tag `v1.0-phase1` |
+| Next | H5: your video recording, then its link in the README and report |
 
 Status values: `todo`, `doing`, `done`.
 
@@ -114,4 +114,4 @@ After F3: push `main`, then create and push `phase-1`.
 | H3 | README: one-command start, scaling, demo scripts, API and UI tour | A clean clone follows it without help. Done for real: a fresh clone in another directory, no `.env`, other ports; `docker compose up -d --build` first failed (RabbitMQ slower than its healthcheck on a cold start; fixed with `start_period`), then the README's steps worked: login, crawl 630/630 in 56 s on 4 workers, search, UI | done |
 | H4 | Report PDF: theme and sites, architecture diagram, URL-life flowchart, crash sequence diagram, data model, choices, fault tolerance and benchmark, compliance | Every one of the 7 sections present: `REPORT.md` rendered to an 8-page `REPORT.pdf` by `scripts/build_report.py` (Chromium, Mermaid diagrams: architecture, URL life with retries, crash sequence, data model); rebuilt with the final Inventaire numbers | done |
 | H5 | Video script and recording (≤10 min, narrated) | Covers every item in the spec's video list. Script done: `docs/phase1/VIDEO.md`, 7 shots in ~9½ min mapped to every item, live steps dry-run (incremental re-crawl: unchanged pages 304, edited page a new version). Recording and its link: yours | doing |
-| H6 | Final rubric check, pull request `phase-1` → `main`, tag `v1.0-phase1` | Merged with green CI | todo |
+| H6 | Final rubric check, pull request `phase-1` → `main`, tag `v1.0-phase1` | Merged with green CI. Rubric checked against SPEC.md: every definition-of-done item and graded area is met and demonstrable, except Inventaire at 59 documents (two site outages, report 1.3) and the video (H5). CI green on `phase-1`; PR opened, merge and tag pending | doing |
