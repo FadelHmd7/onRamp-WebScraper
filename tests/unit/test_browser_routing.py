@@ -13,10 +13,12 @@ UA = "onRamp-WebScraper/0.1 (test)"
 
 class FakeBrowser:
     def __init__(self) -> None:
-        self.calls: list[tuple[str, str, str | None]] = []
+        self.calls: list[tuple[str, str, str | None, int]] = []
 
-    def fetch(self, url: str, wait_until: str, wait_for: str | None) -> FetchResult:
-        self.calls.append((url, wait_until, wait_for))
+    def fetch(
+        self, url: str, wait_until: str, wait_for: str | None, settle_ms: int = 0
+    ) -> FetchResult:
+        self.calls.append((url, wait_until, wait_for, settle_ms))
         return FetchResult(url=url, outcome=Outcome.OK, status=200, body="<p>rendered</p>")
 
 
@@ -60,12 +62,13 @@ def test_browser_site_uses_one_browser_with_its_wait_rules() -> None:
         fetch_mode="browser",
         browser_wait_until="networkidle",
         browser_wait_for=".top-section h2",
+        browser_settle_ms=2000,
     )
     polite.fetch("https://b.example/1", js_site)
     polite.fetch("https://b.example/2", js_site)
     assert len(created) == 1  # started once, then reused
     assert created[0].calls == [
-        ("https://b.example/1", "networkidle", ".top-section h2"),
-        ("https://b.example/2", "networkidle", ".top-section h2"),
+        ("https://b.example/1", "networkidle", ".top-section h2", 2000),
+        ("https://b.example/2", "networkidle", ".top-section h2", 2000),
     ]
     assert http_calls == []

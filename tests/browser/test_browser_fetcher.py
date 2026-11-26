@@ -99,3 +99,30 @@ def test_user_agent_is_sent(site_url: str, browser) -> None:
     result = browser.fetch(f"{site_url}/whoami", wait_for="#user-agent")
     assert result.outcome is Outcome.OK
     assert result.body is not None and f'<p id="user-agent">{UA}</p>' in result.body
+
+
+def test_settle_waits_for_sections_that_arrive_later(site_url: str, browser) -> None:
+    """Like Inventaire: the item appears first, a second section 1.5 s later."""
+    url = f"{site_url}/js/items/3?late_ms=1500"
+    hurried = browser.fetch(url, wait_until="networkidle", wait_for="article.item h1")
+    assert hurried.outcome is Outcome.OK
+    assert 'id="late"' not in (hurried.body or "")  # saved before it arrived
+
+    settled = browser.fetch(
+        url, wait_until="networkidle", wait_for="article.item h1", settle_ms=2000
+    )
+    assert 'id="late"' in (settled.body or "")
+    assert settled.elapsed_ms >= 1500
+
+
+def test_settle_gives_up_on_a_page_that_never_stops_changing(
+    site_url: str, browser, monkeypatch
+) -> None:
+    from onramp_scraper.crawler import browser as browser_module
+
+    monkeypatch.setattr(browser_module, "SETTLE_MAX_MS", 1000)
+    result = browser.fetch(
+        f"{site_url}/js/items/3?late_ms=5000", wait_for="article.item h1", settle_ms=3000
+    )
+    assert result.outcome is Outcome.OK
+    assert result.elapsed_ms < 4000  # capped, not 3 s of quiet after a 5 s change

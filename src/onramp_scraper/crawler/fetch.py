@@ -217,7 +217,9 @@ def _ms(started: float) -> int:
 class BrowserFetch(Protocol):
     """What PoliteFetcher needs from a browser fetcher (see crawler/browser.py)."""
 
-    def fetch(self, url: str, wait_until: str, wait_for: str | None) -> FetchResult: ...
+    def fetch(
+        self, url: str, wait_until: str, wait_for: str | None, settle_ms: int = 0
+    ) -> FetchResult: ...
 
 
 def _default_browser() -> BrowserFetch:
@@ -269,7 +271,9 @@ class PoliteFetcher:
         self.limiter.wait(host, rate)
         if site.fetch_mode == "browser":
             # One page load counts as one request against the limit.
-            result = self.browser.fetch(url, site.browser_wait_until, site.browser_wait_for)
+            result = self.browser.fetch(
+                url, site.browser_wait_until, site.browser_wait_for, site.browser_settle_ms
+            )
         else:
             result = self.http.fetch(url, etag=etag, last_modified=last_modified)
 

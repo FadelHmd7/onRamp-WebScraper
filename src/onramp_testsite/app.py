@@ -161,17 +161,34 @@ def item_json(item_id: int) -> JSONResponse:
 
 
 @app.get("/js/items/{item_id}")
-async def js_item_page(request: Request, item_id: int) -> Response:
-    """The raw HTML has an empty <div id="app">. Only a browser sees the item."""
+async def js_item_page(
+    request: Request, item_id: int, late_ms: int = Query(0, ge=0, le=10_000)
+) -> Response:
+    """The raw HTML has an empty <div id="app">. Only a browser sees the item.
+
+    ``late_ms``: a "related" section is added that long after the item, like
+    an app that fills in sections one after another.
+    """
     item_or_404(item_id)
     await simulated_latency()
+    late = (
+        f"""
+          setTimeout(() => {{
+            const section = document.createElement("section");
+            section.id = "late";
+            section.innerHTML = '<h2>Also loaded later</h2><a href="/items/{item_id + 1}">Next</a>';
+            document.getElementById("app").appendChild(section);
+          }}, {late_ms});"""
+        if late_ms
+        else ""
+    )
     body = f"""    <div id="app"><p class="loading">Loading…</p></div>
     <script>
       fetch("/api/items/{item_id}")
         .then((r) => r.json())
         .then((data) => {{
           document.title = data.title + " | Test Catalog";
-          document.getElementById("app").innerHTML = data.html;
+          document.getElementById("app").innerHTML = data.html;{late}
         }});
     </script>"""
     return html_page(request, content.layout("Loading", body), SITE_EPOCH)

@@ -77,6 +77,9 @@ class SiteConfig(BaseModel):
     fetch_mode: Literal["http", "browser"]
     browser_wait_until: Literal["load", "domcontentloaded", "networkidle"] = "load"
     browser_wait_for: str | None = None
+    # Then wait until the page has not changed for this long (apps that fill in
+    # sections one after another). 0: do not wait. See crawler/browser.py.
+    browser_settle_ms: int = Field(default=0, ge=0, le=10_000)
     seeds: list[HttpUrl] = Field(min_length=1)
     include: list[str] = Field(min_length=1)
     exclude: list[str] = []

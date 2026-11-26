@@ -53,6 +53,9 @@ sites:
     # Raw HTML is an empty shell; wait until the app has finished loading data.
     browser_wait_until: networkidle
     browser_wait_for: .top-section h2     # the entity name: present once data has loaded
+    # The list of an author's works arrives after the name. On a slow load it
+    # was still missing when the page was saved; wait until the page is still.
+    browser_settle_ms: 2000
     # Authors who also have books on Standard Ebooks (overlap for Phase 2).
     seeds:
       - https://inventaire.io/entity/wd:Q36322   # Jane Austen

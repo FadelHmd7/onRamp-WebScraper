@@ -24,7 +24,7 @@ class Settings(BaseSettings):
     log_level: str = "info"
 
     # Sent with every request. Must name a real contact before crawling real sites.
-    user_agent: str = "onRamp-WebScraper/0.1 (contact: you@example.com)"
+    user_agent: str = "onRamp-WebScraper/0.1 (+https://github.com/FadelHmd7/onRamp-WebScraper)"
 
     database_url: str = "postgresql://scraper:scraper@postgres:5432/scraper"
     redis_url: str = "redis://redis:6379/0"

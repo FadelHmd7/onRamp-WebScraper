@@ -9,7 +9,7 @@ name: onramp-scraper
 x-app-env: &app-env
   APP_ENV: ${APP_ENV:-development}
   LOG_LEVEL: ${LOG_LEVEL:-info}
-  USER_AGENT: "${USER_AGENT:-onRamp-WebScraper/0.1 (contact: you@example.com)}"
+  USER_AGENT: "${USER_AGENT:-onRamp-WebScraper/0.1 (+https://github.com/FadelHmd7/onRamp-WebScraper)}"
   DATABASE_URL: postgresql://${POSTGRES_USER:-scraper}:${POSTGRES_PASSWORD:-scraper}@postgres:5432/${POSTGRES_DB:-scraper}
   REDIS_URL: redis://redis:6379/0
   BROKER_URL: amqp://${RABBITMQ_USER:-scraper}:${RABBITMQ_PASSWORD:-scraper}@rabbitmq:5672//
