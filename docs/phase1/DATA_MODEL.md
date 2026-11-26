@@ -26,6 +26,8 @@ erDiagram
         text mode "full | incremental"
         text status "queued | running | finished | failed"
         int created_by FK
+        jsonb seeds "custom seeds, NULL for the configured ones"
+        int max_depth "lower than the site's, or NULL"
         timestamptz created_at
         timestamptz started_at
         timestamptz finished_at

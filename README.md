@@ -204,6 +204,8 @@ CI ([.github/workflows/ci.yml](.github/workflows/ci.yml)) runs on every push: Py
 
 ## Documents
 
+- **[docs/phase1/REPORT.pdf](docs/phase1/REPORT.pdf)** — the Phase 1 report: sites, architecture and diagrams, data model, choices, fault tolerance and benchmark, compliance ([Markdown source](docs/phase1/REPORT.md); rebuild with `uv run python scripts/build_report.py`)
+- [docs/phase1/VIDEO.md](docs/phase1/VIDEO.md) — the script for the narrated demo video
 - [docs/phase1/SPEC.md](docs/phase1/SPEC.md) — the Phase 1 requirements
 - [docs/phase1/TRACKER.md](docs/phase1/TRACKER.md) — tasks, what "done" meant for each, and how it was verified
 - [docs/DECISIONS.md](docs/DECISIONS.md) — the stack, each choice with the alternative rejected and why
