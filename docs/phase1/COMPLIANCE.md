@@ -5,7 +5,7 @@ How the crawler follows each site's `robots.txt`, terms of service and rate limi
 ## Rules for every site
 
 - **robots.txt is checked before every request** (task S2), and the result is cached per host. Our `include` / `exclude` patterns in `config/sites.yaml` only narrow the crawl further; they never override robots.txt.
-- **Descriptive User-Agent with a contact address**, set by `USER_AGENT` in `.env`. Example: `onRamp-WebScraper/0.1 (+https://github.com/FadelHmd7/onRamp-WebScraper; contact: <your address>)`. Crawls of real sites must not run with the placeholder address.
+- **Descriptive User-Agent with a contact**, set by `USER_AGENT` in `.env`. The crawls used `onRamp-WebScraper/0.1 (+https://github.com/FadelHmd7/onRamp-WebScraper)`: the project's repository, where a site owner can reach the maintainer.
 - **One shared rate limit per host**, enforced across all workers through Redis (task S3). Adding workers never raises the request rate to a site.
 - **Backoff on 429 and 503**, honouring `Retry-After` (task W3).
 - **No logins, paywalls or CAPTCHAs, and no bot-detection bypass.** A 401 or 403 response, or a CAPTCHA page, is treated as a permanent failure: the URL is not retried.

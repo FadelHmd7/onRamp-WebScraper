@@ -83,6 +83,10 @@ services:
       interval: 10s
       timeout: 5s
       retries: 10
+      # A cold first start (new volume, slow machine) can take longer than the
+      # retries allow; failures during this grace period do not count.
+      start_period: 120s
+      start_interval: 5s
     restart: unless-stopped
 
   # Applies database migrations and syncs config/sites.yaml, then exits.
