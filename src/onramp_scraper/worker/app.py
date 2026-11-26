@@ -1,0 +1,143 @@
+"""Celery application shared by every worker container.
+
+The settings below are what make a killed worker safe:
+
+- ``task_acks_late``: a job is acknowledged only after it finishes, so a job
+  whose worker dies is still unacknowledged in RabbitMQ.
+- ``task_reject_on_worker_lost``: if the worker process dies, the job goes
+  back to the queue instead of being marked failed.
+- ``worker_prefetch_multiplier = 1``: a worker holds one job at a time, so a
+  crash loses at most that one job, and RabbitMQ redelivers it.
+- ``broker_heartbeat = 5``: RabbitMQ re-queues a dead worker's job as soon as
+  its TCP connection closes. A killed container does not always get to close
+  it (the network vanishes first); then only missed AMQP heartbeats reveal the
+  death. Celery's default of 120 s would leave the job stuck for minutes; at
+  5 s it is back in the queue within about 10-15 s.
+
+The crawl work itself is in ``worker/pipeline.py``; this module only adapts
+it to Celery.
+"""
+
+from functools import lru_cache
+from typing import Any
+
+from celery import Celery, Task
+from celery.signals import (
+    task_postrun,
+    task_prerun,
+    worker_process_init,
+    worker_process_shutdown,
+)
+from redis.exceptions import RedisError
+from sqlalchemy.exc import InterfaceError, OperationalError
+
+from onramp_scraper.config import get_settings
+from onramp_scraper.sites import load_sites
+from onramp_scraper.storage.db import get_engine
+from onramp_scraper.worker.heartbeat import Heartbeat
+from onramp_scraper.worker.pipeline import CrawlContext, Job, process
+from onramp_scraper.worker.runtime import build_context
+
+CRAWL_QUEUE = "crawl"
+
+settings = get_settings()
+app = Celery("onramp_scraper", broker=settings.broker_url)
+app.conf.update(
+    task_default_queue=CRAWL_QUEUE,
+    task_acks_late=True,
+    task_reject_on_worker_lost=True,
+    worker_prefetch_multiplier=1,
+    worker_concurrency=1,
+    broker_heartbeat=5,
+    broker_connection_retry_on_startup=True,
+    task_serializer="json",
+    accept_content=["json"],
+    task_ignore_result=True,  # results live in PostgreSQL, not in a Celery backend
+    # A job that hangs is interrupted (counts as a failed attempt), then killed.
+    task_soft_time_limit=settings.task_soft_time_limit,
+    task_time_limit=settings.task_soft_time_limit + 30,
+)
+
+# Errors of our own infrastructure, not of the page: PostgreSQL or Redis is
+# briefly unreachable. The pipeline cannot even record an attempt, so Celery
+# publishes the job again later. Page errors never get here; the pipeline
+# retries those itself and moves them to the dead-letter queue.
+INFRASTRUCTURE_ERRORS = (OperationalError, InterfaceError, RedisError)
+
+
+def send_jobs(jobs: list[Job], delay: float = 0.0) -> None:
+    for job in jobs:
+        crawl_page.apply_async(kwargs={"job": job.to_message()}, countdown=max(delay, 0.0))
+
+
+@lru_cache
+def context() -> CrawlContext:
+    """Built on the first job, after Celery has forked the worker process."""
+    from redis import Redis
+
+    return build_context(
+        settings,
+        load_sites(),
+        get_engine(),
+        Redis.from_url(settings.redis_url),
+        send_jobs,
+    )
+
+
+@app.task(
+    name="crawl.page",
+    bind=True,
+    autoretry_for=INFRASTRUCTURE_ERRORS,
+    retry_backoff=5,
+    retry_backoff_max=300,
+    retry_jitter=True,
+    max_retries=12,
+)
+def crawl_page(self: Task[Any, Any], job: dict[str, Any]) -> dict[str, Any]:
+    """Crawl one URL. RabbitMQ marks a message redelivered when its worker died."""
+    redelivered = bool((self.request.delivery_info or {}).get("redelivered"))
+    result = process(Job.from_message(job), context(), redelivered=redelivered)
+    return {"status": result.status, "reason": result.reason, "children": len(result.children)}
+
+
+# ---------------------------------------------------------------- heartbeat
+# worker_process_init runs in the process that executes jobs, after the fork.
+
+_heartbeat: Heartbeat | None = None
+
+
+@worker_process_init.connect
+def start_heartbeat(**_: Any) -> None:
+    global _heartbeat
+    from redis import Redis
+
+    _heartbeat = Heartbeat(
+        Redis.from_url(settings.redis_url),
+        ttl=settings.heartbeat_ttl,
+        interval=settings.heartbeat_interval,
+    )
+    _heartbeat.start()
+
+
+@worker_process_shutdown.connect
+def stop_heartbeat(**_: Any) -> None:
+    if _heartbeat is not None:
+        _heartbeat.stop(clean=True)  # a clean stop leaves at once; a kill expires
+
+
+@task_prerun.connect(sender=crawl_page)
+def job_started(kwargs: dict[str, Any] | None = None, **_: Any) -> None:
+    if _heartbeat is not None:
+        _heartbeat.working_on((kwargs or {}).get("job", {}).get("url"))
+
+
+@task_postrun.connect(sender=crawl_page)
+def job_finished(**_: Any) -> None:
+    if _heartbeat is not None:
+        _heartbeat.working_on(None)
+
+
+@app.task(name="worker.ping")
+def ping() -> str:
+    """Proves a worker consumes from the queue (used by CI's smoke test)."""
+    return "pong"

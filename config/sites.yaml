@@ -1,0 +1,152 @@
+# Per-site crawl configuration. Loaded and validated by onramp_scraper.sites.
+#
+# include / exclude: regular expressions matched against the URL path plus
+#   query (for example "/ebooks?page=2"). A URL is crawled only if it matches
+#   at least one include pattern and no exclude pattern. robots.txt is checked
+#   separately for every URL, so these patterns narrow the crawl; they never
+#   widen what robots.txt allows.
+# fetch_mode: "http" for plain requests, "browser" for Playwright rendering.
+# requests_per_second: shared by ALL workers for that host.
+# fields: site-specific values pulled with CSS selectors from the page as
+#   fetched (processing/fields.py). "attr" reads an attribute instead of the
+#   text, "many" keeps every match, "key"/"value" build a mapping, "pattern"
+#   keeps a regex group, and "type" (int, float) converts a single value.
+#
+# Evidence for every rule here: docs/phase1/SITES.md and COMPLIANCE.md.
+
+sites:
+  # ------------------------------------------------------------ Site A: static
+  - key: books-toscrape
+    name: Books to Scrape (sandbox)
+    role: static
+    base_url: https://books.toscrape.com/
+    allowed_hosts: [books.toscrape.com]
+    fetch_mode: http
+    seeds:
+      - https://books.toscrape.com/index.html
+    include:
+      - ^/(index\.html)?$
+      - ^/catalogue/page-\d+\.html$
+      - ^/catalogue/[^/]+_\d+/index\.html$
+    exclude: []
+    max_depth: 60          # listing pages chain through 50 "next" links
+    max_pages: 300
+    requests_per_second: 2
+    remove:
+      - .alert-warning        # "This is a demo website" banner on every page
+    fields:
+      price: {selector: "article.product_page p.price_color", pattern: '(\d+(?:\.\d+)?)', type: float}
+      currency: {selector: "article.product_page p.price_color", pattern: '^\D+'}
+      availability: {selector: "article.product_page p.availability"}
+      in_stock: {selector: "article.product_page p.availability", pattern: '\((\d+) available\)', type: int}
+      rating: {selector: "article.product_page p.star-rating", attr: class, pattern: 'star-rating (\w+)'}
+      category: {selector: "ul.breadcrumb li:nth-of-type(3) a"}
+      product_info: {selector: "article.product_page table tr", key: th, value: td}   # UPC, tax, ...
+
+  # ------------------------------------------------------------ Site B: JavaScript
+  - key: inventaire
+    name: Inventaire
+    role: javascript
+    base_url: https://inventaire.io/
+    allowed_hosts: [inventaire.io]
+    fetch_mode: browser
+    # Raw HTML is an empty shell; wait until the app has finished loading data.
+    browser_wait_until: networkidle
+    browser_wait_for: .top-section h2     # the entity name: present once data has loaded
+    # The list of an author's works arrives after the name. On a slow load it
+    # was still missing when the page was saved; wait until the page is still.
+    browser_settle_ms: 2000
+    # Authors who also have books on Standard Ebooks (overlap for Phase 2).
+    seeds:
+      - https://inventaire.io/entity/wd:Q36322   # Jane Austen
+      - https://inventaire.io/entity/wd:Q5686    # Charles Dickens
+      - https://inventaire.io/entity/wd:Q47152   # Mary Shelley
+      - https://inventaire.io/entity/wd:Q7245    # Mark Twain
+      - https://inventaire.io/entity/wd:Q7243    # Leo Tolstoy
+    include:
+      # Entity pages only. robots.txt disallows /entity/*/* sub-pages.
+      - ^/entity/(wd|inv|isbn):[^/?#]+$
+    exclude: []
+    max_depth: 2           # author -> work -> edition
+    max_pages: 150
+    requests_per_second: 0.1   # robots.txt Crawl-delay: 10
+    # The page <h1> is the site logo; the entity name is this <h2>.
+    title_selector: .top-section h2
+    # App chrome, not bibliographic content.
+    remove:
+      - .large-screen-actions   # edit / history menus
+      - .type-label             # "Work", "Author": kept in the entity_type field
+      - .flash                  # app messages such as "invalid user:"
+      - .filters                # edition filters and counters
+      - .filters-wrapper
+      - .items-lists-section    # users' personal inventories
+    # From rendered pages (tests/fixtures/inventaire). Svelte adds generated
+    # classes such as "svelte-vpir1l" that change on every deploy; these
+    # selectors use only the stable, meaningful class names.
+    fields:
+      name: {selector: ".top-section h2"}
+      entity_type: {selector: "h2.type-label"}               # Author, Work, Edition
+      authors: {selector: ".work-section .author-info .author-label", many: true}
+      summary: {selector: ".work-section .summary p"}
+      claims:                                                  # First publication date, Genre, ...
+        selector: ".work-section .claims-infobox .claim"
+        key: ".property"
+        value: ".values"
+      # The entity's own dates: a work page also shows its author's dates in .work-section.
+      birth_year:
+        selector: '.birth-or-death-dates:not(.work-section *) .date[title="date of birth"]'
+        type: int
+      death_year:
+        selector: '.birth-or-death-dates:not(.work-section *) .date[title="date of death"]'
+        type: int
+
+  # ------------------------------------------------------------ Site C: pagination
+  - key: standard-ebooks
+    name: Standard Ebooks
+    role: paginated
+    base_url: https://standardebooks.org/
+    allowed_hosts: [standardebooks.org]
+    fetch_mode: http
+    seeds:
+      - https://standardebooks.org/ebooks?page=1
+    include:
+      - ^/ebooks\?page=\d+$
+      - ^/ebooks/[^/?#]+/[^/?#]+(/[^/?#]+)?$   # author/title[/translator]
+    exclude:
+      - /downloads(/|$)
+      - /text(/|$)
+      - ^/honeypot
+    max_depth: 140         # 129 listing pages chained by rel="next"
+    max_pages: 700
+    requests_per_second: 1
+    fields:
+      author: {selector: 'article.ebook a[property="schema:author"] span[property="schema:name"]'}
+      abstract: {selector: 'article.ebook > meta[property="schema:abstract"]', attr: content}
+      word_count: {selector: 'article.ebook meta[property="schema:wordCount"]', attr: content, type: int}
+      collections: {selector: 'article.ebook a[property="schema:isPartOf"]', many: true}
+      language: {selector: 'article.ebook meta[property="schema:inLanguage"]', attr: content}
+      published: {selector: 'article.ebook meta[property="schema:datePublished"]', attr: content}
+      wikipedia_url: {selector: 'article.ebook > meta[property="schema:sameAs"]', attr: content}
+
+  # ------------------------------------------------------------ Local test site
+  - key: testsite
+    name: Local test site
+    role: test
+    base_url: http://testsite:8000/
+    allowed_hosts: [testsite]
+    fetch_mode: http
+    seeds:
+      - http://testsite:8000/catalog?page=1
+    include:
+      - ^/catalog\?page=\d+$
+      - ^/items/\d+$
+      - ^/editable(/[a-z0-9-]+)?$
+      # Failure modes for the demos (W3, W6); nothing links to them, demos seed them.
+      - ^/(slow|flaky|throttle|broken)/\d+(\?.*)?$
+    exclude: []
+    max_depth: 40
+    max_pages: 700
+    requests_per_second: 100   # our own server; high so the benchmark measures workers
+    fields:
+      price: {selector: "article.item p.price", pattern: '(\d+(?:\.\d+)?)', type: float}
+      sku: {selector: "article.item", attr: data-sku}

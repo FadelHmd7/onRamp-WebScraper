@@ -1,0 +1,190 @@
+# Start everything:          docker compose up --build
+# Run four workers:          docker compose up --build --scale worker=4
+#
+# Every setting has a default, so a clean checkout starts without a .env file.
+# Copy .env.example to .env to override any of them.
+
+name: onramp-scraper
+
+x-app-env: &app-env
+  APP_ENV: ${APP_ENV:-development}
+  LOG_LEVEL: ${LOG_LEVEL:-info}
+  USER_AGENT: "${USER_AGENT:-onRamp-WebScraper/0.1 (+https://github.com/FadelHmd7/onRamp-WebScraper)}"
+  DATABASE_URL: postgresql://${POSTGRES_USER:-scraper}:${POSTGRES_PASSWORD:-scraper}@postgres:5432/${POSTGRES_DB:-scraper}
+  REDIS_URL: redis://redis:6379/0
+  BROKER_URL: amqp://${RABBITMQ_USER:-scraper}:${RABBITMQ_PASSWORD:-scraper}@rabbitmq:5672//
+  DEFAULT_MAX_DEPTH: ${DEFAULT_MAX_DEPTH:-2}
+  DEFAULT_MAX_PAGES: ${DEFAULT_MAX_PAGES:-50}
+  REQUESTS_PER_SECOND: ${REQUESTS_PER_SECOND:-1}
+  MAX_FETCH_ATTEMPTS: ${MAX_FETCH_ATTEMPTS:-5}
+  RETRY_BASE_DELAY: ${RETRY_BASE_DELAY:-2}
+  RETRY_MAX_DELAY: ${RETRY_MAX_DELAY:-300}
+  TASK_SOFT_TIME_LIMIT: ${TASK_SOFT_TIME_LIMIT:-120}
+  HEARTBEAT_TTL: ${HEARTBEAT_TTL:-15}
+  HEARTBEAT_INTERVAL: ${HEARTBEAT_INTERVAL:-5}
+  RABBITMQ_API_URL: http://rabbitmq:15672
+  # API logins. The defaults are for local development; set real values in
+  # .env (with APP_ENV other than development the API refuses the defaults).
+  JWT_SECRET: ${JWT_SECRET:-dev-only-jwt-secret-not-for-production-use}
+  JWT_TTL_MINUTES: ${JWT_TTL_MINUTES:-60}
+  ADMIN_USERNAME: ${ADMIN_USERNAME:-admin}
+  ADMIN_PASSWORD: ${ADMIN_PASSWORD:-admin-dev-password}
+  VIEWER_USERNAME: ${VIEWER_USERNAME:-viewer}
+  VIEWER_PASSWORD: ${VIEWER_PASSWORD:-viewer-dev-password}
+
+x-backing-services: &backing-services
+  postgres:
+    condition: service_healthy
+  redis:
+    condition: service_healthy
+  rabbitmq:
+    condition: service_healthy
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-scraper}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-scraper}
+      POSTGRES_DB: ${POSTGRES_DB:-scraper}
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+    restart: unless-stopped
+
+  redis:
+    image: redis:7-alpine
+    # Append-only file: the seen-set and rate-limit state survive a restart.
+    command: ["redis-server", "--appendonly", "yes"]
+    volumes:
+      - redis-data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+    restart: unless-stopped
+
+  rabbitmq:
+    image: rabbitmq:4.1-management-alpine
+    environment:
+      RABBITMQ_DEFAULT_USER: ${RABBITMQ_USER:-scraper}
+      RABBITMQ_DEFAULT_PASS: ${RABBITMQ_PASSWORD:-scraper}
+    ports:
+      - "${RABBITMQ_UI_PORT:-15672}:15672"  # management console
+    volumes:
+      - rabbitmq-data:/var/lib/rabbitmq
+    healthcheck:
+      test: ["CMD", "rabbitmq-diagnostics", "-q", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      # A cold first start (new volume, slow machine) can take longer than the
+      # retries allow; failures during this grace period do not count.
+      start_period: 120s
+      start_interval: 5s
+    restart: unless-stopped
+
+  # Applies database migrations and syncs config/sites.yaml, then exits.
+  # The API and workers start only after it succeeds.
+  migrate:
+    build:
+      context: .
+      target: api
+    command: ["python", "-m", "onramp_scraper.storage.migrate"]
+    environment: *app-env
+    depends_on:
+      postgres:
+        condition: service_healthy
+    restart: "no"
+
+  api:
+    build:
+      context: .
+      target: api
+    environment: *app-env
+    ports:
+      - "${API_PORT:-9060}:8000"
+    depends_on:
+      <<: *backing-services
+      migrate:
+        condition: service_completed_successfully
+    restart: unless-stopped
+
+  # No container_name and no published port, so `--scale worker=N` works.
+  # Each replica is a separate container that shares only the queue,
+  # database and cache.
+  worker:
+    build:
+      context: .
+      target: worker
+    environment: *app-env
+    depends_on:
+      <<: *backing-services
+      migrate:
+        condition: service_completed_successfully
+    restart: unless-stopped
+    # Give a running job time to finish on `docker compose stop`.
+    # `docker kill` skips this, which is the crash demo.
+    stop_grace_period: 30s
+
+  # Bonus: scales `worker` from the queue backlog (autoscaler/policy.py).
+  # Off by default; start it with: docker compose --profile autoscale up -d
+  # It needs the Docker socket, which gives full control of Docker on this
+  # machine, so it runs only when asked for, and only for local use.
+  autoscaler:
+    profiles: ["autoscale"]
+    build:
+      context: .
+      target: api
+    command: ["python", "-m", "onramp_scraper.autoscaler"]
+    user: root  # the Docker socket is owned by root
+    healthcheck:
+      disable: true  # the image's check is the API's /health; this service has no HTTP
+    environment:
+      <<: *app-env
+      AUTOSCALE_MIN: ${AUTOSCALE_MIN:-1}
+      AUTOSCALE_MAX: ${AUTOSCALE_MAX:-8}
+      AUTOSCALE_JOBS_PER_WORKER: ${AUTOSCALE_JOBS_PER_WORKER:-25}
+      AUTOSCALE_COOLDOWN: ${AUTOSCALE_COOLDOWN:-30}
+      AUTOSCALE_INTERVAL: ${AUTOSCALE_INTERVAL:-5}
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+    depends_on:
+      rabbitmq:
+        condition: service_healthy
+      worker:
+        condition: service_started
+    restart: unless-stopped
+
+  ui:
+    build:
+      context: ui
+    ports:
+      - "${UI_PORT:-9070}:80"
+    depends_on:
+      api:
+        condition: service_healthy
+    restart: unless-stopped
+
+  # Local test site: 630 pages, failure modes and editable pages.
+  # Workers reach it at http://testsite:8000. The host port is bound to
+  # 127.0.0.1 because its /_admin routes have no auth.
+  testsite:
+    build:
+      context: .
+      target: testsite
+    environment:
+      TESTSITE_LATENCY_MS: ${TESTSITE_LATENCY_MS:-50}
+    ports:
+      - "127.0.0.1:${TESTSITE_PORT:-9050}:8000"
+    restart: unless-stopped
+
+volumes:
+  postgres-data:
+  redis-data:
+  rabbitmq-data:

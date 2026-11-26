@@ -1,0 +1,106 @@
+{
+  "books-toscrape/book-a-light-in-the-attic.html": {
+    "etag": "\"63e40de8-243f\"",
+    "fetched_at": "2026-11-24T14:42:23+00:00",
+    "last_modified": "Wed, 08 Feb 2023 21:02:32 GMT",
+    "rendered": false,
+    "status": 200,
+    "url": "https://books.toscrape.com/catalogue/a-light-in-the-attic_1000/index.html"
+  },
+  "books-toscrape/book-sapiens.html": {
+    "etag": "\"63e40de8-4282\"",
+    "fetched_at": "2026-11-24T14:42:23+00:00",
+    "last_modified": "Wed, 08 Feb 2023 21:02:32 GMT",
+    "rendered": false,
+    "status": 200,
+    "url": "https://books.toscrape.com/catalogue/sapiens-a-brief-history-of-humankind_996/index.html"
+  },
+  "books-toscrape/listing-page-1.html": {
+    "etag": "\"63e40de8-c85e\"",
+    "fetched_at": "2026-11-24T14:42:21+00:00",
+    "last_modified": "Wed, 08 Feb 2023 21:02:32 GMT",
+    "rendered": false,
+    "status": 200,
+    "url": "https://books.toscrape.com/index.html"
+  },
+  "books-toscrape/listing-page-50.html": {
+    "etag": "\"63e40de8-c4fb\"",
+    "fetched_at": "2026-11-24T14:42:22+00:00",
+    "last_modified": "Wed, 08 Feb 2023 21:02:32 GMT",
+    "rendered": false,
+    "status": 200,
+    "url": "https://books.toscrape.com/catalogue/page-50.html"
+  },
+  "inventaire/author-jane-austen.html": {
+    "etag": "\"6b04c41a-132a\"",
+    "fetched_at": "2026-11-24T16:05:38+00:00",
+    "last_modified": "Mon, 23 Nov 2026 22:54:18 GMT",
+    "rendered": true,
+    "status": 200,
+    "url": "https://inventaire.io/entity/wd:Q36322"
+  },
+  "inventaire/robots.txt": {
+    "etag": "\"6b04c41a-97\"",
+    "fetched_at": "2026-11-24T14:42:29+00:00",
+    "last_modified": "Mon, 23 Nov 2026 22:54:18 GMT",
+    "rendered": false,
+    "status": 200,
+    "url": "https://inventaire.io/robots.txt"
+  },
+  "inventaire/work-pride-and-prejudice.html": {
+    "etag": "\"6b04c41a-132a\"",
+    "fetched_at": "2026-11-24T16:05:14+00:00",
+    "last_modified": "Mon, 23 Nov 2026 22:54:18 GMT",
+    "rendered": true,
+    "status": 200,
+    "url": "https://inventaire.io/entity/wd:Q170583"
+  },
+  "inventaire/work-pride-and-prejudice.raw.html": {
+    "etag": "\"6b04c41a-132a\"",
+    "fetched_at": "2026-11-24T14:42:49+00:00",
+    "last_modified": "Mon, 23 Nov 2026 22:54:18 GMT",
+    "rendered": false,
+    "status": 200,
+    "url": "https://inventaire.io/entity/wd:Q170583"
+  },
+  "standard-ebooks/book-pride-and-prejudice.html": {
+    "etag": null,
+    "fetched_at": "2026-11-24T14:42:28+00:00",
+    "last_modified": null,
+    "rendered": false,
+    "status": 200,
+    "url": "https://standardebooks.org/ebooks/jane-austen/pride-and-prejudice"
+  },
+  "standard-ebooks/book-war-and-peace.html": {
+    "etag": null,
+    "fetched_at": "2026-11-24T14:42:29+00:00",
+    "last_modified": null,
+    "rendered": false,
+    "status": 200,
+    "url": "https://standardebooks.org/ebooks/leo-tolstoy/war-and-peace/louise-maude_aylmer-maude"
+  },
+  "standard-ebooks/listing-page-1.html": {
+    "etag": null,
+    "fetched_at": "2026-11-24T14:42:26+00:00",
+    "last_modified": null,
+    "rendered": false,
+    "status": 200,
+    "url": "https://standardebooks.org/ebooks?page=1"
+  },
+  "standard-ebooks/listing-page-129.html": {
+    "etag": null,
+    "fetched_at": "2026-11-24T14:42:27+00:00",
+    "last_modified": null,
+    "rendered": false,
+    "status": 200,
+    "url": "https://standardebooks.org/ebooks?page=129"
+  },
+  "standard-ebooks/robots.txt": {
+    "etag": "\"17ffcd-1b2-65e5c14e48dbf-gzip\"",
+    "fetched_at": "2026-11-24T14:42:24+00:00",
+    "last_modified": "Wed, 21 Oct 2026 16:17:20 GMT",
+    "rendered": false,
+    "status": 200,
+    "url": "https://standardebooks.org/robots.txt"
+  }
+}
