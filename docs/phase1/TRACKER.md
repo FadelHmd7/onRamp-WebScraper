@@ -13,8 +13,8 @@ Spec: `docs/phase1/SPEC.md`. Stack: `docs/DECISIONS.md`.
 
 | | |
 | --- | --- |
-| Current | **H1** — Real crawls (Inventaire is down; resuming when it is back) |
-| Next | H1/H2 when Inventaire is back, your video recording (H5), then H6 |
+| Current | **H5** — your video recording |
+| Next | H6: final check, PR and tag after your go-ahead |
 
 Status values: `todo`, `doing`, `done`.
 
@@ -109,9 +109,9 @@ After F3: push `main`, then create and push `phase-1`.
 
 | ID | Task | Done when | Status |
 | --- | --- | --- | --- |
-| H1 | Crawl all three real sites within their limits | 100+ valid documents per site. books.toscrape 300 and Standard Ebooks 700 stored, no failures; Inventaire 23 of 150 when inventaire.io started refusing connections (from two networks), crawl cancelled until it is back | doing |
+| H1 | Crawl all three real sites within their limits | 100+ valid documents per site. books.toscrape 300 and Standard Ebooks 700 stored, no failures; Inventaire 59: inventaire.io went down twice (connections refused from two networks), and both crawls were cancelled. 7 author pages have two versions. 59 < 100 is the site's availability, documented in the report (1.3) | done |
 | H2 | Export script and committed sample: 100+ documents per site, one with several versions | `exports/` sample checked in: 120 documents each from books.toscrape, Standard Ebooks and the test site (its pricing page with 3 versions); Inventaire 23 until the site is back | doing |
 | H3 | README: one-command start, scaling, demo scripts, API and UI tour | A clean clone follows it without help. Done for real: a fresh clone in another directory, no `.env`, other ports; `docker compose up -d --build` first failed (RabbitMQ slower than its healthcheck on a cold start; fixed with `start_period`), then the README's steps worked: login, crawl 630/630 in 56 s on 4 workers, search, UI | done |
-| H4 | Report PDF: theme and sites, architecture diagram, URL-life flowchart, crash sequence diagram, data model, choices, fault tolerance and benchmark, compliance | Every one of the 7 sections present: `REPORT.md` rendered to an 8-page `REPORT.pdf` by `scripts/build_report.py` (Chromium, Mermaid diagrams: architecture, URL life with retries, crash sequence, data model); rebuilt once the Inventaire crawl completes | done |
+| H4 | Report PDF: theme and sites, architecture diagram, URL-life flowchart, crash sequence diagram, data model, choices, fault tolerance and benchmark, compliance | Every one of the 7 sections present: `REPORT.md` rendered to an 8-page `REPORT.pdf` by `scripts/build_report.py` (Chromium, Mermaid diagrams: architecture, URL life with retries, crash sequence, data model); rebuilt with the final Inventaire numbers | done |
 | H5 | Video script and recording (≤10 min, narrated) | Covers every item in the spec's video list. Script done: `docs/phase1/VIDEO.md`, 7 shots in ~9½ min mapped to every item, live steps dry-run (incremental re-crawl: unchanged pages 304, edited page a new version). Recording and its link: yours | doing |
 | H6 | Final rubric check, pull request `phase-1` → `main`, tag `v1.0-phase1` | Merged with green CI | todo |

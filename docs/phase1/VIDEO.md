@@ -45,7 +45,7 @@ docker compose ps
 
 **Show:** Dashboard → start a crawl of **Books to Scrape** for a few seconds of progress; then the crawl list with the finished earlier crawls.
 
-**Say:** "The three real sites: books.toscrape.com — static HTML; Standard Ebooks — 129 paginated catalog pages; Inventaire — a JavaScript application, rendered in headless Chromium. Each has its own rate limit shared by all workers — two requests a second, one, and one every ten seconds as its robots.txt asks — so the full crawls take minutes; here are the ones I ran earlier: 300 and 700 pages, no failures." For Inventaire, say that the site went down during the crawl and the crawl was stopped rather than left retrying (or show its finished crawl if it has been re-run since).
+**Say:** "The three real sites: books.toscrape.com — static HTML; Standard Ebooks — 129 paginated catalog pages; Inventaire — a JavaScript application, rendered in headless Chromium. Each has its own rate limit shared by all workers — two requests a second, one, and one every ten seconds as its robots.txt asks — so the full crawls take minutes; here are the ones I ran earlier: 300 and 700 pages, no failures." For Inventaire: "59 pages: the site went down twice during the crawl, and each time the crawl was stopped rather than left retrying." Optionally open *Jane Austen* on Inventaire → Versions: the second rendering added her works list.
 
 **Show:** Search → `sherlock holmes` → open *The Memoirs of Sherlock Holmes* (Standard Ebooks: author, collections, the description); then a books.toscrape book with its **product table** (Search, site Books to Scrape, no words → any book).
 

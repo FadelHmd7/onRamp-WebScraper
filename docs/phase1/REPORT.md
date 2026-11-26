@@ -6,7 +6,7 @@ A distributed, fault-tolerant crawler for three book websites. It cleans and ver
 
 | | |
 | --- | --- |
-| Pages crawled from real sites | books.toscrape.com 300, Standard Ebooks 700, Inventaire 23 (the site went down mid-crawl; see 1.3) — no failed page on any site |
+| Pages crawled from real sites | books.toscrape.com 300, Standard Ebooks 700, Inventaire 59 (the site went down twice mid-crawl; see 1.3) — no page failed while its site was up |
 | Scaling | 396 → 674 → 1,083 → 1,273 pages per minute with 1, 2, 4, 8 workers (630-page test site) |
 | Failure demos | worker killed mid-page, timeout, 429, always-failing page: all four recover as specified, scripted and repeatable |
 | Tests | 760 Python tests (unit, integration with real PostgreSQL and Redis, browser) and 43 UI tests, all run in CI on every push |
@@ -31,17 +31,21 @@ Rejected along the way: a university-course theme (no compliant JavaScript or pa
 | --- | ---: | ---: | ---: | ---: |
 | books.toscrape.com | 300 (page budget) | 294 books: price, stock, rating, category, product table | 14 min | 0 |
 | standardebooks.org | 700 (page budget) | 571 ebooks: author, abstract, word count, collections, language | 12 min | 0 |
-| inventaire.io | 23 | 23 entities: name, type, authors, claims, dates | — | 0 (crawl cancelled) |
+| inventaire.io | 59 | 59 entities: name, type, authors, claims, dates; 7 with two versions | 2 runs, 1 page / 10 s | 0 while up; 28 dead letters during the second outage |
 
-Both full crawls ran at the same time on 4 workers, each site at its own rate. A sample of 120 cleaned documents per site is in [exports/](../../exports/).
+The first two full crawls ran at the same time on 4 workers, each site at its own rate. A sample of cleaned documents is in [exports/](../../exports/): 120 each from books.toscrape.com and Standard Ebooks, and all 59 from Inventaire.
 
 ### 1.2 What the real crawl taught us
 
 Inventaire's first author pages were saved **before their list of works had loaded**: the entity name was on the page and the network was idle, but the app was still filling in sections (Mary Shelley's page had 0 links to works; a later rendering of the same page has 34). The fetcher now has a per-site *settle* step: after the usual waits it watches the page until it has not changed for 2 s (capped at 15 s). A test page that adds a section 1.5 s late reproduces the bug and proves the fix. The workers were rebuilt **in the middle of the crawl**: queued jobs stayed in RabbitMQ and the crawl continued under the new code, which is the at-least-once design doing its job.
 
-### 1.3 Inventaire went down
+### 1.3 Inventaire went down — twice
 
-At 23 of 150 pages, inventaire.io began refusing connections — from our network and from a second, unrelated one, so an outage on their side rather than a block of this crawler. The crawler classified it correctly (connection refused is retryable, with backoff), but 127 queued pages × 5 attempts would have kept knocking on a failing site, so the crawl was **cancelled**: every queued job then ends without a request. It resumes from the configured seeds when the site is back; the export is refreshed then.
+At 23 of 150 pages, inventaire.io began refusing connections — from our network and from a second, unrelated one, so an outage on their side rather than a block of this crawler. The crawler classified it correctly (connection refused is retryable, with backoff), but 127 queued pages × 5 attempts would have kept knocking on a failing site, so the crawl was **cancelled**: every queued job then ends without a request.
+
+When the site came back, a new full crawl started from the configured seeds. Over 70 minutes it stored 36 new pages and re-rendered 11 of the earlier ones before the site failed again: 4 were unchanged, and **7 author pages got a second version** — Jane Austen, Mary Shelley, Mark Twain and Leo Tolstoy now with their works lists, the first real-site documents with a version history. Then inventaire.io refused connections again, from both networks. This time 28 pages exhausted their 5 attempts before the crawl was cancelled; they are in the dead-letter queue, where an admin can retry them once the site answers. Inventaire therefore has **59 documents, not the 100 the spec asks for** — a limit of the site's availability during this phase, not of the crawler, which stored every page it could reach.
+
+Two of the 7 second versions (Samuel Johnson, Henry Fielding) are the same works in a different order: Inventaire does not sort these lists in a fixed way, and the content hash treats order as content. Sorting such lists before hashing would be wrong for most sites, so this is accepted noise for this one. One more went the wrong way: Charles Dickens's page was captured *before* its 159-work list appeared, though the settle step waited for 2 s of quiet. The settle step makes the race rare, not impossible; version 1, with the list, is kept in the history. A per-site selector that must appear before saving (for example the works section) is the Phase 2 fix.
 
 ---
 
