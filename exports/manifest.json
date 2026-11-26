@@ -1,5 +1,5 @@
 {
-  "exported_at": "2026-11-26T08:40:18+00:00",
+  "exported_at": "2026-11-26T12:37:14+00:00",
   "api": "http://localhost:9060",
   "per_site": 120,
   "sites": {
@@ -12,10 +12,18 @@
     },
     "inventaire": {
       "file": "inventaire.jsonl",
-      "documents": 23,
-      "available": 23,
-      "with_fields": 23,
-      "with_several_versions": []
+      "documents": 59,
+      "available": 59,
+      "with_fields": 59,
+      "with_several_versions": [
+        "https://inventaire.io/entity/wd:Q183266",
+        "https://inventaire.io/entity/wd:Q34190",
+        "https://inventaire.io/entity/wd:Q36322",
+        "https://inventaire.io/entity/wd:Q47152",
+        "https://inventaire.io/entity/wd:Q5686",
+        "https://inventaire.io/entity/wd:Q7243",
+        "https://inventaire.io/entity/wd:Q7245"
+      ]
     },
     "standard-ebooks": {
       "file": "standard-ebooks.jsonl",
@@ -27,7 +35,7 @@
     "testsite": {
       "file": "testsite.jsonl",
       "documents": 120,
-      "available": 631,
+      "available": 634,
       "with_fields": 119,
       "with_several_versions": [
         "http://testsite:8000/editable/pricing"

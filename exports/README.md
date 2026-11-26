@@ -6,12 +6,14 @@ Cleaned documents from the crawls, written by [scripts/export.py](../scripts/exp
 | --- | ---: | --- | --- |
 | [books-toscrape.jsonl](books-toscrape.jsonl) | 120 of 300 | a full crawl of books.toscrape.com | price, currency, stock, rating, category, product table |
 | [standard-ebooks.jsonl](standard-ebooks.jsonl) | 120 of 700 | a full crawl of standardebooks.org | author, abstract, word count, collections, language, date |
-| [inventaire.jsonl](inventaire.jsonl) | 23 | a crawl of inventaire.io, rendered in Chromium | name, entity type, authors, claims, birth and death years |
-| [testsite.jsonl](testsite.jsonl) | 120 of 631 | the local test site | price, SKU; includes the document with several versions |
+| [inventaire.jsonl](inventaire.jsonl) | 59 of 59 | two crawls of inventaire.io, rendered in Chromium | name, entity type, authors, claims, birth and death years |
+| [testsite.jsonl](testsite.jsonl) | 120 of 634 | the local test site | price, SKU; includes the document with several versions |
 
-**Inventaire is incomplete.** Its crawl had stored 23 pages when inventaire.io stopped accepting connections (refused from two different networks, so an outage on their side, not a block of this crawler). The crawl was cancelled so no retries kept knocking. This file is refreshed with 100+ documents once the site is back.
+**Inventaire has 59 documents, not 100.** inventaire.io went down twice during this phase, refusing connections from two different networks, so these are outages on their side, not a block of this crawler. Each time, the crawl was cancelled. The file holds every Inventaire page that was stored. `scripts/export.py` warns about it (`fewer than 100 documents for: inventaire`) and exits with status 1.
 
-**The document with several versions** is `http://testsite:8000/editable/pricing`: its page was edited twice between crawls, so it has versions 1, 2 and 3. The real sites did not change during the crawls; the test site exists to show versioning on demand.
+**Documents with several versions.**
+- `http://testsite:8000/editable/pricing`: the test-site page was edited twice between crawls, so it has versions 1, 2 and 3. The test site exists to show versioning on demand.
+- Seven Inventaire author pages were rendered again by the second crawl and got a version 2. Jane Austen, Mary Shelley, Mark Twain and Leo Tolstoy gained their works lists, which had not finished loading the first time. Samuel Johnson and Henry Fielding list the same works in a different order: the site does not return them in a fixed order, and list order is part of the content. Charles Dickens went the other way: his version 2 was captured before the works list appeared, and version 1 keeps it (see section 1.3 of the [report](../docs/phase1/REPORT.md)).
 
 ## Format
 
