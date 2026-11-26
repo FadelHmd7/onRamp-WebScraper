@@ -14,7 +14,7 @@ Spec: `docs/phase1/SPEC.md`. Stack: `docs/DECISIONS.md`.
 | | |
 | --- | --- |
 | Current | **H1** — Real crawls (Inventaire is down; resuming when it is back) |
-| Next | **H2** — Export, then H3 README |
+| Next | **H3** — README, then H4 report and H5 video script |
 
 Status values: `todo`, `doing`, `done`.
 
@@ -110,7 +110,7 @@ After F3: push `main`, then create and push `phase-1`.
 | ID | Task | Done when | Status |
 | --- | --- | --- | --- |
 | H1 | Crawl all three real sites within their limits | 100+ valid documents per site. books.toscrape 300 and Standard Ebooks 700 stored, no failures; Inventaire 23 of 150 when inventaire.io started refusing connections (from two networks), crawl cancelled until it is back | doing |
-| H2 | Export script and committed sample: 100+ documents per site, one with several versions | `exports/` sample checked in | todo |
+| H2 | Export script and committed sample: 100+ documents per site, one with several versions | `exports/` sample checked in: 120 documents each from books.toscrape, Standard Ebooks and the test site (its pricing page with 3 versions); Inventaire 23 until the site is back | doing |
 | H3 | README: one-command start, scaling, demo scripts, API and UI tour | A clean clone follows it without help | todo |
 | H4 | Report PDF: theme and sites, architecture diagram, URL-life flowchart, crash sequence diagram, data model, choices, fault tolerance and benchmark, compliance | Every one of the 7 sections present | todo |
 | H5 | Video script and recording (≤10 min, narrated) | Covers every item in the spec's video list | todo |

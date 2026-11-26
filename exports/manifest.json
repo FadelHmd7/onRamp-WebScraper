@@ -1,0 +1,37 @@
+{
+  "exported_at": "2026-11-26T08:40:18+00:00",
+  "api": "http://localhost:9060",
+  "per_site": 120,
+  "sites": {
+    "books-toscrape": {
+      "file": "books-toscrape.jsonl",
+      "documents": 120,
+      "available": 300,
+      "with_fields": 120,
+      "with_several_versions": []
+    },
+    "inventaire": {
+      "file": "inventaire.jsonl",
+      "documents": 23,
+      "available": 23,
+      "with_fields": 23,
+      "with_several_versions": []
+    },
+    "standard-ebooks": {
+      "file": "standard-ebooks.jsonl",
+      "documents": 120,
+      "available": 700,
+      "with_fields": 120,
+      "with_several_versions": []
+    },
+    "testsite": {
+      "file": "testsite.jsonl",
+      "documents": 120,
+      "available": 631,
+      "with_fields": 119,
+      "with_several_versions": [
+        "http://testsite:8000/editable/pricing"
+      ]
+    }
+  }
+}
