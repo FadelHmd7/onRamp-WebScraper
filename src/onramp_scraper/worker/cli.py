@@ -21,7 +21,7 @@ from onramp_scraper.storage.crawls import CrawlProgress, progress
 from onramp_scraper.storage.dead_letters import list_dead
 from onramp_scraper.worker.app import context
 from onramp_scraper.worker.heartbeat import active_workers
-from onramp_scraper.worker.runs import MODES, retry_dead_letter, start_crawl
+from onramp_scraper.worker.runs import MODES, CrawlCancelled, retry_dead_letter, start_crawl
 
 
 def describe(p: CrawlProgress) -> dict[str, object]:
@@ -105,7 +105,12 @@ def main(argv: list[str]) -> int:
         for worker in active_workers(context().frontier.redis):
             print(json.dumps(worker))
     elif args.command == "retry":
-        if not retry_dead_letter(context(), args.dead_letter_id):
+        try:
+            sent = retry_dead_letter(context(), args.dead_letter_id)
+        except CrawlCancelled as exc:
+            print(f"dead letter {args.dead_letter_id}: {exc}", file=sys.stderr)
+            return 1
+        if not sent:
             print(f"dead letter {args.dead_letter_id} is not in the queue", file=sys.stderr)
             return 1
         print(f"retried {args.dead_letter_id}")

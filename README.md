@@ -87,7 +87,7 @@ curl -H "Authorization: Bearer $TOKEN" "localhost:9060/search?q=distributed+syst
 | `GET /documents/{id}/versions[/{n}]` | viewer | version history, any old version in full |
 | `GET /pages/{id}/raw` | viewer | the HTML as fetched, with status, headers and time |
 | `GET /search?q=&site=` | viewer | PostgreSQL full-text search (GIN index) with snippets |
-| `GET /dlq`, `POST /dlq/{id}/retry` | admin | failed jobs and retry |
+| `GET /dlq`, `POST /dlq/{id}/retry` | admin | failed jobs and retry (409 if its crawl was cancelled) |
 
 **Command line**, inside any worker container:
 

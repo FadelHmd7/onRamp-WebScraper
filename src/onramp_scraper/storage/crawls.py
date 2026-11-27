@@ -163,6 +163,13 @@ def finish_if_done(session: Session, crawl_id: uuid.UUID) -> bool:
     return bool(getattr(result, "rowcount", 0))
 
 
+CANCELLED = "failed"  # a crawl stopped by hand; its remaining jobs are dropped
+
+
+def is_cancelled(session: Session, crawl_id: uuid.UUID) -> bool:
+    return session.scalar(select(Crawl.status).where(Crawl.id == crawl_id)) == CANCELLED
+
+
 def reopen(session: Session, crawl_id: uuid.UUID) -> None:
     """A finished crawl runs again when one of its URLs is queued again (dead-letter retry)."""
     session.execute(

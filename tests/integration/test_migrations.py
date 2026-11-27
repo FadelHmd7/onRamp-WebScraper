@@ -172,3 +172,50 @@ def test_downgrade_and_upgrade_again(engine: Engine, database_url: str) -> None:
     assert not TABLES & set(inspect(engine).get_table_names())
     command.upgrade(config, "head")
     assert set(inspect(engine).get_table_names()) >= TABLES
+
+
+def test_0004_puts_back_retries_stuck_in_a_cancelled_crawl(
+    engine: Engine, database_url: str
+) -> None:
+    config = alembic_config(database_url)
+    command.downgrade(config, "0003")
+    sync_sites(engine)
+    with engine.begin() as connection:
+        ids = {}
+        for name, crawl_status in (("cancelled", "failed"), ("live", "running")):
+            ids[name] = connection.execute(
+                text(
+                    "INSERT INTO crawls (id, site_key, mode, status) "
+                    "VALUES (gen_random_uuid(), 'testsite', 'full', :s) RETURNING id"
+                ),
+                {"s": crawl_status},
+            ).scalar_one()
+            connection.execute(
+                text(
+                    "INSERT INTO crawl_urls (crawl_id, url, depth, status, attempts) "
+                    "VALUES (:c, 'http://testsite:8000/broken/1', 0, 'queued', 0)"
+                ),
+                {"c": ids[name]},
+            )
+            connection.execute(
+                text(
+                    "INSERT INTO dead_letters (crawl_id, site_key, url, depth, attempts, "
+                    "last_error, status, failed_at, retried_at) VALUES (:c, 'testsite', "
+                    "'http://testsite:8000/broken/1', 0, 5, 'HTTP 503', 'retried', now(), now())"
+                ),
+                {"c": ids[name]},
+            )
+    command.upgrade(config, "head")
+    with engine.connect() as connection:
+        rows = {
+            row[0]: tuple(row[1:])
+            for row in connection.execute(
+                text(
+                    "SELECT d.crawl_id, d.status, d.retried_at IS NULL, u.status, u.attempts, "
+                    "u.last_error FROM dead_letters d JOIN crawl_urls u "
+                    "ON u.crawl_id = d.crawl_id AND u.url = d.url"
+                )
+            )
+        }
+    assert rows[ids["cancelled"]] == ("dead", True, "dead", 5, "HTTP 503")
+    assert rows[ids["live"]] == ("retried", False, "queued", 0, None)  # still on its way

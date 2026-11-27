@@ -16,6 +16,14 @@ from onramp_scraper.storage import crawls
 from onramp_scraper.storage.models import DeadLetter
 
 
+class CrawlCancelled(Exception):
+    """The dead letter's crawl was cancelled, so its job would be dropped unrun."""
+
+    def __init__(self, crawl_id: uuid.UUID) -> None:
+        super().__init__(f"its crawl {crawl_id} was cancelled, so the job cannot run again")
+        self.crawl_id = crawl_id
+
+
 def bury(
     session: Session,
     *,
@@ -55,6 +63,9 @@ def resolve(session: Session, crawl_id: uuid.UUID, url: str) -> None:
 def take_for_retry(session: Session, dead_letter_id: int) -> DeadLetter | None:
     """Mark a dead URL as retried and queue it in its crawl again. None if it is not dead.
 
+    Raises ``CrawlCancelled`` if its crawl was cancelled: workers drop that
+    crawl's jobs, so the row would otherwise say "retried" forever.
+
     The caller sends the job after this transaction commits.
     """
     row = session.scalars(
@@ -62,6 +73,8 @@ def take_for_retry(session: Session, dead_letter_id: int) -> DeadLetter | None:
     ).one_or_none()
     if row is None or row.status != "dead":
         return None
+    if crawls.is_cancelled(session, row.crawl_id):
+        raise CrawlCancelled(row.crawl_id)
     row.status = "retried"
     row.retried_at = datetime.now(UTC)
     crawls.set_url_status(
@@ -88,8 +101,26 @@ def list_dead(
 def put_back(session: Session, dead_letter_id: int) -> None:
     """Undo ``take_for_retry`` when the job could not be sent."""
     row = session.get(DeadLetter, dead_letter_id, with_for_update=True)
-    if row is None or row.status != "retried":
-        return
+    if row is not None:
+        _return_to_queue(session, row)
+
+
+def release(session: Session, crawl_id: uuid.UUID, url: str) -> bool:
+    """A retried job that will not run (its crawl was cancelled) waits in the queue again.
+
+    Without this the row would say "retried" forever. True if a row went back.
+    """
+    row = session.scalars(
+        select(DeadLetter)
+        .where(DeadLetter.crawl_id == crawl_id, DeadLetter.url == url)
+        .with_for_update()
+    ).one_or_none()
+    return row is not None and _return_to_queue(session, row)
+
+
+def _return_to_queue(session: Session, row: DeadLetter) -> bool:
+    if row.status != "retried":
+        return False
     row.status = "dead"
     row.retried_at = None
     crawls.set_url_status(
@@ -101,3 +132,4 @@ def put_back(session: Session, dead_letter_id: int) -> None:
         attempts=row.attempts,
         error=row.last_error,
     )
+    return True

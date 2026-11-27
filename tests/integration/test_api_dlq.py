@@ -5,7 +5,7 @@ from collections.abc import Iterator
 import pytest
 from fastapi.testclient import TestClient
 from redis import Redis
-from sqlalchemy import Engine
+from sqlalchemy import Engine, text
 
 from onramp_scraper.api.deps import crawl_context
 from onramp_scraper.config import Settings
@@ -98,3 +98,57 @@ def test_viewers_cannot_see_or_retry_the_queue(api: TestClient, failed: LocalCra
     viewer = login(api, VIEWER)
     assert api.get("/dlq", headers=viewer).status_code == 403
     assert api.post("/dlq/1/retry", headers=viewer).status_code == 403
+
+
+def _cancel(engine: Engine, crawl_id: str) -> None:
+    """Cancel a crawl the way an admin does by hand: its status becomes 'failed'."""
+    with engine.begin() as connection:
+        connection.execute(
+            text("UPDATE crawls SET status = 'failed' WHERE id = :c"), {"c": crawl_id}
+        )
+
+
+def _states(engine: Engine, dead_letter_id: int) -> tuple[str, str]:
+    with engine.connect() as connection:
+        row = connection.execute(
+            text(
+                "SELECT d.status, u.status FROM dead_letters d JOIN crawl_urls u "
+                "ON u.crawl_id = d.crawl_id AND u.url = d.url WHERE d.id = :d"
+            ),
+            {"d": dead_letter_id},
+        ).one()
+    return row[0], row[1]
+
+
+def test_a_job_of_a_cancelled_crawl_cannot_be_retried(
+    api: TestClient, failed: LocalCrawl, pg_engine: Engine
+) -> None:
+    admin = login(api, ADMIN)
+    letter = api.get("/dlq", headers=admin).json()["items"][0]
+    assert (letter["retryable"], letter["crawl_status"]) == (True, "finished")
+    _cancel(pg_engine, letter["crawl_id"])
+
+    listed = api.get("/dlq", headers=admin).json()["items"][0]
+    assert (listed["retryable"], listed["crawl_status"]) == (False, "failed")
+    refused = api.post(f"/dlq/{letter['id']}/retry", headers=admin)
+    assert refused.status_code == 409
+    assert "was cancelled" in refused.json()["detail"]
+    assert failed.outstanding == 0  # nothing was sent
+    assert _states(pg_engine, letter["id"]) == ("dead", "dead")
+
+
+def test_a_retry_whose_crawl_is_cancelled_before_it_runs_goes_back_to_the_queue(
+    api: TestClient, failed: LocalCrawl, pg_engine: Engine
+) -> None:
+    admin = login(api, ADMIN)
+    letter = api.get("/dlq", headers=admin).json()["items"][0]
+    assert api.post(f"/dlq/{letter['id']}/retry", headers=admin).status_code == 202
+    assert _states(pg_engine, letter["id"]) == ("retried", "queued")
+    _cancel(pg_engine, letter["crawl_id"])  # cancelled while the job waits in the queue
+
+    failed.results.clear()
+    failed.run(workers=1)
+    assert [r.status for _, r in failed.results] == ["cancelled"]
+    assert _states(pg_engine, letter["id"]) == ("dead", "dead")  # not "retried" forever
+    back = api.get("/dlq", headers=admin).json()["items"]
+    assert letter["id"] in [item["id"] for item in back]

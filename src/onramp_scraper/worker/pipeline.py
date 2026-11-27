@@ -117,6 +117,10 @@ def process(job: Job, ctx: CrawlContext, redelivered: bool = False) -> JobResult
             select(Crawl).where(Crawl.id == crawl_id, Crawl.status != "failed")
         ).one_or_none()
         if crawl is None:
+            # Cancelled: drop the job. A dead-letter retry goes back to the
+            # queue instead of saying "retried" forever.
+            if dead_letters.release(session, crawl_id, job.url):
+                session.commit()
             return JobResult("cancelled")
         mode = crawl.mode
         if crawl.max_depth is not None:  # this crawl goes less deep than the site allows

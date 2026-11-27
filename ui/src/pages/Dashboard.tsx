@@ -506,7 +506,9 @@ function DeadLetters({ health, onRetried }: { health: Health | null; onRetried: 
       notify("info", `Sent again: ${letter.url}`);
       onRetried();
     } catch (err) {
-      if (err instanceof ApiError && err.status === 409) {
+      if (err instanceof ApiError && err.status === 409 && err.message.includes("cancelled")) {
+        notify("bad", "Its crawl was cancelled, so this job cannot run again.");
+      } else if (err instanceof ApiError && err.status === 409) {
         notify("info", "That job was already sent again.");
       } else {
         notify("bad", `The retry did not go out: ${message(err)}`);
@@ -522,6 +524,7 @@ function DeadLetters({ health, onRetried }: { health: Health | null; onRetried: 
   }
 
   const data = dlq.data;
+  const stranded = data?.dead.filter((d) => d.retryable === false).length ?? 0;
   const recent = data ? [...data.retried, ...data.resolved.filter((r) => sent.has(r.id) || isRecent(r))] : [];
 
   return (
@@ -534,6 +537,12 @@ function DeadLetters({ health, onRetried }: { health: Health | null; onRetried: 
       {queueDown && <p className="note warn">The job queue is not answering, so retries are paused.</p>}
       {!queueDown && noWorkers && (
         <p className="note warn">No workers are running. A retried job waits in the queue until one starts.</p>
+      )}
+      {stranded > 0 && (
+        <p className="note">
+          {stranded === 1 ? "One job belongs" : `${stranded} jobs belong`} to a cancelled crawl and
+          cannot run again. Start a new crawl of the site to fetch {stranded === 1 ? "it" : "them"}.
+        </p>
       )}
       {!data ? (
         <Loading />
@@ -559,6 +568,7 @@ function DeadLetters({ health, onRetried }: { health: Health | null; onRetried: 
                   <td className="url">
                     {d.url}
                     {sent.has(d.id) && <span className="badge bad">failed again</span>}
+                    {d.retryable === false && <span className="badge">crawl cancelled</span>}
                   </td>
                   <td>{d.last_error}</td>
                   <td className="num">{d.attempts}</td>
@@ -567,8 +577,14 @@ function DeadLetters({ health, onRetried }: { health: Health | null; onRetried: 
                     <BusyButton
                       busy={sending.has(d.id)}
                       busyText="Sending…"
-                      disabled={queueDown}
-                      title={queueDown ? "The job queue is not answering" : undefined}
+                      disabled={queueDown || d.retryable === false}
+                      title={
+                        d.retryable === false
+                          ? "Its crawl was cancelled, so this job cannot run again"
+                          : queueDown
+                            ? "The job queue is not answering"
+                            : undefined
+                      }
                       onClick={() => void retry(d)}
                     >
                       Retry

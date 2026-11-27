@@ -383,6 +383,10 @@ label {
   font-size: 0.92rem;
 }
 
+.note:not(.warn) {
+  background: var(--surface-2);
+}
+
 .note.warn {
   background: var(--warn-bg);
   color: var(--warn);

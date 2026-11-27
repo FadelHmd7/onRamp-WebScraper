@@ -87,6 +87,10 @@ export interface DeadLetter {
   status: DeadLetterStatus;
   failed_at: string;
   retried_at?: string | null;
+  /** Its crawl's status; "failed" means the crawl was cancelled. */
+  crawl_status?: string;
+  /** False when its crawl was cancelled: the job would be dropped unrun. */
+  retryable?: boolean;
 }
 
 export type DeadLetterStatus = "dead" | "retried" | "resolved";

@@ -212,4 +212,23 @@ describe("Dashboard", () => {
     expect(await retryButtonFor(DEAD.url)).toBeDisabled();
     expect(screen.getByText(/retries are paused/)).toBeInTheDocument();
   });
+
+  it("does not offer to retry a job whose crawl was cancelled", async () => {
+    const stranded = { ...DEAD, crawl_status: "failed", retryable: false };
+    const api = dashboardAs("admin", { "/dlq": dlqBy({ dead: [stranded] }) });
+    const retry = await retryButtonFor(DEAD.url);
+    expect(retry).toBeDisabled();
+    expect(retry).toHaveAttribute("title", "Its crawl was cancelled, so this job cannot run again");
+    expect(screen.getByText("crawl cancelled")).toBeInTheDocument();
+    expect(screen.getByText(/belongs to a cancelled crawl/)).toBeInTheDocument();
+    expect(api.calls.some((c) => c.method === "POST")).toBe(false);
+  });
+
+  it("explains a 409 when the crawl was cancelled after the page loaded", async () => {
+    dashboardAs("admin", {
+      "POST /dlq/7/retry": [409, { detail: "its crawl c1 was cancelled, so the job cannot run again" }],
+    });
+    await userEvent.click(await retryButtonFor(DEAD.url));
+    expect(await screen.findByText("Its crawl was cancelled, so this job cannot run again.")).toBeInTheDocument();
+  });
 });

@@ -12,9 +12,12 @@ from sqlalchemy import func, select
 from onramp_scraper.crawler.frontier import in_scope
 from onramp_scraper.crawler.urls import normalize_url
 from onramp_scraper.storage import crawls, dead_letters
+from onramp_scraper.storage.dead_letters import CrawlCancelled
 from onramp_scraper.worker.pipeline import CrawlContext, Job
 
 MODES = ("full", "incremental")
+
+__all__ = ["MODES", "CrawlAlreadyRunning", "CrawlCancelled", "retry_dead_letter", "start_crawl"]
 
 
 class CrawlAlreadyRunning(Exception):
@@ -84,7 +87,8 @@ def retry_dead_letter(ctx: CrawlContext, dead_letter_id: int) -> bool:
 
     The row is committed as "retried" before the job is sent; otherwise a fast
     worker could pick the job up, still see "dead", and drop it. If sending
-    fails, the row goes back to "dead" so the admin can try again.
+    fails, the row goes back to "dead" so the admin can try again. Raises
+    ``CrawlCancelled`` when the dead letter's crawl was cancelled.
     """
     with ctx.sessions.begin() as session:
         row = dead_letters.take_for_retry(session, dead_letter_id)
