@@ -28,6 +28,7 @@ MATRIX: dict[tuple[str, str], Access] = {
     ("POST", "/crawls"): "admin",
     ("GET", "/crawls"): "viewer",
     ("GET", "/crawls/{crawl_id}"): "viewer",
+    ("GET", "/crawls/{crawl_id}/urls"): "viewer",
     ("GET", "/pages/{page_id}/raw"): "viewer",
     ("GET", "/documents"): "viewer",
     ("GET", "/documents/{document_id}"): "viewer",

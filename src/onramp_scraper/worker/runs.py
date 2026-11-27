@@ -7,12 +7,26 @@ line (``python -m onramp_scraper.worker.cli``) both call it.
 
 import uuid
 
+from sqlalchemy import func, select
+
 from onramp_scraper.crawler.frontier import in_scope
 from onramp_scraper.crawler.urls import normalize_url
 from onramp_scraper.storage import crawls, dead_letters
 from onramp_scraper.worker.pipeline import CrawlContext, Job
 
 MODES = ("full", "incremental")
+
+
+class CrawlAlreadyRunning(Exception):
+    """The site already has a whole-site crawl that is queued or running."""
+
+    def __init__(self, site_key: str, crawl_id: uuid.UUID) -> None:
+        super().__init__(
+            f"{site_key!r} is already being crawled (crawl {crawl_id}); "
+            "wait for it to finish before starting another"
+        )
+        self.site_key = site_key
+        self.crawl_id = crawl_id
 
 
 def start_crawl(
@@ -22,8 +36,15 @@ def start_crawl(
     seeds: list[str] | None = None,
     created_by: int | None = None,
     max_depth: int | None = None,
+    exclusive: bool = False,
 ) -> uuid.UUID:
     """Start a crawl of one site.
+
+    ``exclusive`` (the API sets it) refuses a whole-site crawl while another
+    one of the same site is queued or running, with ``CrawlAlreadyRunning``.
+    A transaction-level advisory lock per site makes the check and the insert
+    atomic, so two admins clicking at once still start only one crawl. Crawls
+    with custom seeds (demos, re-checks) are never refused.
 
     ``seeds`` replaces the configured seeds and ``max_depth`` lowers the site's
     depth limit (demos, re-checks: ``max_depth=0`` crawls only the seeds).
@@ -45,6 +66,11 @@ def start_crawl(
 
     with ctx.sessions.begin() as session:
         custom = urls if seeds is not None else None
+        if exclusive and custom is None:
+            session.execute(select(func.pg_advisory_xact_lock(func.hashtext(f"crawl:{site_key}"))))
+            running = crawls.active_whole_site_crawl(session, site_key)
+            if running is not None:
+                raise CrawlAlreadyRunning(site_key, running.id)
         crawl_id = crawls.create_crawl(session, site_key, mode, created_by, custom, max_depth).id
     accepted = ctx.frontier.offer(str(crawl_id), site, urls)
     with ctx.sessions.begin() as session:

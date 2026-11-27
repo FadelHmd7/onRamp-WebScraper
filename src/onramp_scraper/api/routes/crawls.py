@@ -10,8 +10,9 @@ from pydantic import BaseModel, Field
 from onramp_scraper.api.deps import AdminUser, CurrentUser, SessionDep, crawl_context
 from onramp_scraper.api.schemas import Page
 from onramp_scraper.storage import crawls as store
+from onramp_scraper.storage.models import Crawl
 from onramp_scraper.worker.pipeline import CrawlContext
-from onramp_scraper.worker.runs import start_crawl
+from onramp_scraper.worker.runs import CrawlAlreadyRunning, start_crawl
 
 router = APIRouter(prefix="/crawls", tags=["crawls"])
 
@@ -57,6 +58,9 @@ class CrawlOut(BaseModel):
         description="URLs by status: queued, fetched, unchanged, skipped, failed, dead"
     )
     errors: int
+    whole_site: bool = Field(
+        description="True for a crawl of the site's configured seeds; false for custom seeds"
+    )
 
 
 class CrawlDetail(CrawlOut):
@@ -83,6 +87,7 @@ def _out(progress: store.CrawlProgress) -> CrawlOut:
         done=progress.done,
         counts=progress.counts,
         errors=progress.errors,
+        whole_site=progress.whole_site,
     )
 
 
@@ -96,10 +101,15 @@ def create_crawl(
 ) -> CrawlOut:
     """Start a crawl (admin). Returns at once; the workers do the crawling.
 
-    Follow it with `GET /crawls/{id}`.
+    Follow it with `GET /crawls/{id}`. 409 if the site already has a whole-site
+    crawl queued or running (crawls with custom `seeds` are always accepted).
     """
     try:
-        crawl_id = start_crawl(ctx, body.site, body.mode, body.seeds, user.id, body.max_depth)
+        crawl_id = start_crawl(
+            ctx, body.site, body.mode, body.seeds, user.id, body.max_depth, exclusive=True
+        )
+    except CrawlAlreadyRunning as exc:
+        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=str(exc)) from None
     except ValueError as exc:
         raise HTTPException(status_code=422, detail=str(exc)) from None
     response.headers["Location"] = f"/crawls/{crawl_id}"
@@ -142,3 +152,42 @@ def get_crawl(crawl_id: uuid.UUID, _: CurrentUser, session: SessionDep) -> Crawl
         for row in store.recent_errors(session, crawl_id)
     ]
     return CrawlDetail(**_out(found).model_dump(), recent_errors=errors)
+
+
+UrlStatus = Literal["queued", "fetched", "unchanged", "skipped", "failed", "dead"]
+
+
+class CrawlUrlOut(BaseModel):
+    url: str
+    status: UrlStatus
+    depth: int
+    attempts: int
+    last_error: str | None
+    updated_at: datetime
+
+
+@router.get("/{crawl_id}/urls", response_model=Page[CrawlUrlOut])
+def list_crawl_urls(
+    crawl_id: uuid.UUID,
+    _: CurrentUser,
+    session: SessionDep,
+    url_status: Annotated[list[UrlStatus] | None, Query(alias="status")] = None,
+    limit: Annotated[int, Query(ge=1, le=100)] = 50,
+    offset: Annotated[int, Query(ge=0)] = 0,
+) -> Page[CrawlUrlOut]:
+    """The crawl's URLs, most recently updated first. Repeat `status` to filter by several."""
+    if session.get(Crawl, crawl_id) is None:
+        raise HTTPException(status_code=404, detail="No such crawl")
+    rows, total = store.list_urls(session, crawl_id, list(url_status or []), limit, offset)
+    items = [
+        CrawlUrlOut(
+            url=row.url,
+            status=row.status,  # type: ignore[arg-type]  # checked by a database constraint
+            depth=row.depth,
+            attempts=row.attempts,
+            last_error=row.last_error,
+            updated_at=row.updated_at,
+        )
+        for row in rows
+    ]
+    return Page(items=items, total=total, limit=limit, offset=offset)

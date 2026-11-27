@@ -151,3 +151,66 @@ def test_sites_lists_the_configuration(api: TestClient) -> None:
     assert set(by_key) == {"books-toscrape", "inventaire", "standard-ebooks", "testsite"}
     assert by_key["inventaire"]["fetch_mode"] == "browser"
     assert by_key["inventaire"]["requests_per_second"] == 0.1
+
+
+def test_a_second_whole_site_crawl_is_refused_until_the_first_ends(
+    api: TestClient, local: LocalCrawl, live_testsite: str
+) -> None:
+    admin = login(api, ADMIN)
+    first = api.post("/crawls", json={"site": "testsite"}, headers=admin)
+    assert first.status_code == 202
+    assert first.json()["whole_site"] is True
+
+    again = api.post("/crawls", json={"site": "testsite", "mode": "incremental"}, headers=admin)
+    assert again.status_code == 409
+    assert "already being crawled" in again.json()["detail"]
+    assert first.json()["id"] in again.json()["detail"]
+
+    # Custom seeds are a targeted re-check, not a second whole-site crawl.
+    seeded = api.post(
+        "/crawls", json={"site": "testsite", "seeds": [f"{live_testsite}/items/1"]}, headers=admin
+    )
+    assert seeded.status_code == 202
+    assert seeded.json()["whole_site"] is False
+
+    local.run(workers=2)
+    assert api.get(f"/crawls/{first.json()['id']}", headers=admin).json()["status"] == "finished"
+    assert api.post("/crawls", json={"site": "testsite"}, headers=admin).status_code == 202
+
+
+def test_crawl_urls_are_listed_newest_first_and_filtered_by_status(
+    api: TestClient, local: LocalCrawl, live_testsite: str
+) -> None:
+    admin = login(api, ADMIN)
+    seeds = [f"{live_testsite}/items/99999", f"{live_testsite}/items/3", f"{live_testsite}/items/4"]
+    crawl_id = api.post("/crawls", json={"site": "testsite", "seeds": seeds}, headers=admin).json()[
+        "id"
+    ]
+    viewer = login(api, VIEWER)
+    queued = api.get(f"/crawls/{crawl_id}/urls", headers=viewer).json()
+    assert queued["total"] == 3
+    assert {u["status"] for u in queued["items"]} == {"queued"}
+
+    local.run(workers=1)
+    done = api.get(
+        f"/crawls/{crawl_id}/urls",
+        params=[("status", "fetched"), ("status", "unchanged"), ("limit", "1")],
+        headers=viewer,
+    ).json()
+    assert (done["total"], len(done["items"])) == (2, 1)
+    [failed] = api.get(
+        f"/crawls/{crawl_id}/urls", params={"status": "failed"}, headers=viewer
+    ).json()["items"]
+    assert (failed["url"], failed["last_error"], failed["attempts"]) == (
+        f"{live_testsite}/items/99999",
+        "HTTP 404",
+        1,
+    )
+    assert (
+        api.get(f"/crawls/{crawl_id}/urls", params={"status": "bogus"}, headers=viewer).status_code
+        == 422
+    )
+    assert (
+        api.get("/crawls/00000000-0000-0000-0000-000000000000/urls", headers=viewer).status_code
+        == 404
+    )

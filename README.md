@@ -80,8 +80,9 @@ curl -H "Authorization: Bearer $TOKEN" "localhost:9060/search?q=distributed+syst
 | `POST /auth/token`, `GET /auth/me` | anyone / logged in | log in (JWT), who am I |
 | `GET /health` | public | dependencies, queue length, active workers |
 | `GET /sites` | viewer | the configured sites |
-| `POST /crawls` | admin | start a full or incremental crawl |
+| `POST /crawls` | admin | start a full or incremental crawl (409 while the site already has one running) |
 | `GET /crawls`, `GET /crawls/{id}` | viewer | progress, counts by status, recent errors |
+| `GET /crawls/{id}/urls?status=` | viewer | the crawl's URLs and their state, newest first |
 | `GET /documents`, `GET /documents/{id}` | viewer | cleaned documents, filtered and paginated |
 | `GET /documents/{id}/versions[/{n}]` | viewer | version history, any old version in full |
 | `GET /pages/{id}/raw` | viewer | the HTML as fetched, with status, headers and time |

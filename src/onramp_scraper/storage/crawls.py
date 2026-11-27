@@ -14,7 +14,7 @@ import uuid
 from dataclasses import dataclass
 from datetime import UTC, datetime
 
-from sqlalchemy import func, select, update
+from sqlalchemy import func, or_, select, update
 from sqlalchemy.dialects.postgresql import insert
 from sqlalchemy.orm import Session
 
@@ -112,6 +112,7 @@ class CrawlProgress:
     started_at: datetime | None
     finished_at: datetime | None
     counts: dict[str, int]
+    whole_site: bool = True  # False: custom seeds (a demo, a re-check)
 
     @property
     def total(self) -> int:
@@ -212,6 +213,7 @@ def _progress_of(crawl: Crawl, counts: dict[str, int]) -> CrawlProgress:
         started_at=crawl.started_at,
         finished_at=crawl.finished_at,
         counts=counts,
+        whole_site=crawl.seeds is None,
     )
 
 
@@ -229,3 +231,39 @@ def recent_errors(session: Session, crawl_id: uuid.UUID, limit: int = 20) -> lis
             .limit(limit)
         )
     )
+
+
+ACTIVE_STATUSES = ("queued", "running")
+
+
+def active_whole_site_crawl(session: Session, site_key: str) -> Crawl | None:
+    """The site's queued or running crawl of its configured seeds, if any."""
+    return session.scalars(
+        select(Crawl)
+        .where(
+            Crawl.site_key == site_key,
+            # The JSONB column stores Python None as JSON null, not SQL NULL.
+            or_(Crawl.seeds.is_(None), func.jsonb_typeof(Crawl.seeds) == "null"),
+            Crawl.status.in_(ACTIVE_STATUSES),
+        )
+        .order_by(Crawl.created_at.desc())
+        .limit(1)
+    ).first()
+
+
+def list_urls(
+    session: Session,
+    crawl_id: uuid.UUID,
+    statuses: list[str] | None = None,
+    limit: int = 50,
+    offset: int = 0,
+) -> tuple[list[CrawlUrl], int]:
+    """A page of the crawl's URLs, most recently updated first, and the total."""
+    query = select(CrawlUrl).where(CrawlUrl.crawl_id == crawl_id)
+    if statuses:
+        query = query.where(CrawlUrl.status.in_(statuses))
+    total = session.scalar(select(func.count()).select_from(query.subquery())) or 0
+    rows = session.scalars(
+        query.order_by(CrawlUrl.updated_at.desc(), CrawlUrl.url).limit(limit).offset(offset)
+    )
+    return list(rows), total
