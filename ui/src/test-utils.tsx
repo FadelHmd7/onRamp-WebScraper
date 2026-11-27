@@ -3,6 +3,8 @@
 import { render } from "@testing-library/react";
 import type { ReactElement } from "react";
 import { MemoryRouter } from "react-router";
+
+import { ToastProvider } from "./toast";
 import { vi } from "vitest";
 
 export type Handler = (request: { url: URL; init?: RequestInit }) => [number, unknown];
@@ -50,7 +52,11 @@ export const HEALTH = {
 };
 
 export function renderAt(path: string, ui: ReactElement) {
-  return render(<MemoryRouter initialEntries={[path]}>{ui}</MemoryRouter>);
+  return render(
+    <MemoryRouter initialEntries={[path]}>
+      <ToastProvider>{ui}</ToastProvider>
+    </MemoryRouter>,
+  );
 }
 
 export function signedIn(role: "admin" | "viewer") {

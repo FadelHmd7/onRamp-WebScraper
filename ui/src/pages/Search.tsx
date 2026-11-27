@@ -7,6 +7,7 @@ import { Link, useSearchParams } from "react-router";
 
 import { api, type DocumentSummary, type Page, type SearchHit, type Site } from "../api";
 import { Snippet } from "../components/Snippet";
+import { Loading, Spinner } from "../components/Spinner";
 import { ago } from "../format";
 
 const PER_PAGE = 20;
@@ -112,7 +113,9 @@ export function Search() {
             ))}
           </select>
         </label>
-        <button type="submit">Search</button>
+        <button type="submit" className="primary">
+          Search
+        </button>
       </form>
 
       {error && (
@@ -120,27 +123,35 @@ export function Search() {
           {error}
         </p>
       )}
+      {!results && loading && <Loading>Searching…</Loading>}
       {results && (
-        <p className="muted" aria-live="polite">
+        <p className="muted results-count" aria-live="polite">
           {results.kind === "search"
             ? `${total} result${total === 1 ? "" : "s"} for “${q}”`
             : `${total} documents, most recently changed first`}
-          {loading && " · updating…"}
+          {loading && (
+            <>
+              {" "}
+              <Spinner label="Updating" />
+            </>
+          )}
         </p>
       )}
 
       {results?.kind === "search" &&
         results.page.items.map((hit) => (
-          <article className="panel" key={hit.id}>
+          <article className="panel hit" key={hit.id}>
             <h2>
               <Link to={`/documents/${hit.id}`}>{hit.title}</Link>
             </h2>
             <div className="url muted">{hit.url}</div>
             <Snippet html={hit.snippet} />
-            <span className="badge">{hit.site}</span>{" "}
-            <span className="muted" style={{ fontSize: "0.85rem" }}>
-              version {hit.version} · {ago(hit.crawled_at)}
-            </span>
+            <p className="hit-meta">
+              <span className="badge">{hit.site}</span>
+              <span className="muted small">
+                Version {hit.version}, crawled {ago(hit.crawled_at)}
+              </span>
+            </p>
           </article>
         ))}
 

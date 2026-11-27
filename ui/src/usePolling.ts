@@ -15,10 +15,8 @@ export function usePolling<T>(load: () => Promise<T>, intervalMs: number): Polle
   const [data, setData] = useState<T | null>(null);
   const [error, setError] = useState<string | null>(null);
   const loadRef = useRef(load);
-  useEffect(() => {
-    loadRef.current = load; // always poll with the latest filters
-  }, [load]);
   const alive = useRef(true);
+  const mounted = useRef(false);
 
   const refresh = useCallback(() => {
     loadRef
@@ -32,6 +30,14 @@ export function usePolling<T>(load: () => Promise<T>, intervalMs: number): Polle
         if (alive.current) setError(err instanceof Error ? err.message : String(err));
       });
   }, []);
+
+  // Always poll with the latest filters; when they change, load at once
+  // instead of showing the old answer until the next tick.
+  useEffect(() => {
+    loadRef.current = load;
+    if (mounted.current) refresh();
+    mounted.current = true;
+  }, [load, refresh]);
 
   useEffect(() => {
     alive.current = true;

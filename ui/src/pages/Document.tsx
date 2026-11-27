@@ -14,6 +14,7 @@ import {
   type VersionHistory,
 } from "../api";
 import { Blocks } from "../components/Blocks";
+import { BusyButton, Loading } from "../components/Spinner";
 import { diffBlocks } from "../diff";
 import { ago } from "../format";
 
@@ -54,7 +55,7 @@ export function DocumentPage() {
       </section>
     );
   }
-  if (!loaded || loaded.id !== id) return <p className="muted">Loading…</p>;
+  if (!loaded || loaded.id !== id) return <Loading>Loading the document…</Loading>;
 
   const { doc, history } = loaded;
   const requested = Number(params.get("v") ?? doc.version);
@@ -64,9 +65,9 @@ export function DocumentPage() {
 
   return (
     <section>
-      <p className="muted">
+      <nav className="crumbs muted" aria-label="Breadcrumb">
         <Link to="/search">Search</Link> / {doc.site}
-      </p>
+      </nav>
       <h1>{doc.title}</h1>
       <p>
         <a className="url" href={doc.url} target="_blank" rel="noopener noreferrer nofollow">
@@ -187,7 +188,7 @@ function OldVersion({ id, version, current }: { id: number; version: number; cur
   }, [id, version]);
 
   if (error) return <p className="error">{error}</p>;
-  if (!state || state.version !== version) return <p className="muted">Loading version {version}…</p>;
+  if (!state || state.version !== version) return <Loading>Loading version {version}…</Loading>;
   const changes = state.previous ? diffBlocks(state.previous.blocks, state.data.blocks) : null;
   return (
     <>
@@ -261,9 +262,9 @@ function Raw({ pageId }: { pageId: number }) {
     <div className="panel">
       <h2>Raw HTML</h2>
       {!raw && (
-        <button type="button" className="secondary" onClick={() => void load()} disabled={busy}>
-          {busy ? "Loading…" : "Show the HTML as fetched"}
-        </button>
+        <BusyButton className="secondary" busy={busy} busyText="Loading…" onClick={() => void load()}>
+          Show the HTML as fetched
+        </BusyButton>
       )}
       {error && <p className="error">{error}</p>}
       {raw && (

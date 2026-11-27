@@ -2,25 +2,29 @@ import { NavLink, Route, Routes } from "react-router";
 
 import { AuthProvider, RequireAuth, useAuth } from "./auth";
 import { HealthBadge } from "./components/HealthBadge";
+import { Robot } from "./components/Robot";
 import { Dashboard } from "./pages/Dashboard";
 import { DocumentPage } from "./pages/Document";
 import { Login } from "./pages/Login";
 import { Search } from "./pages/Search";
+import { ToastProvider } from "./toast";
 
 export function App() {
   return (
     <AuthProvider>
-      <Routes>
-        <Route path="/login" element={<Login />} />
-        <Route
-          path="*"
-          element={
-            <RequireAuth>
-              <Shell />
-            </RequireAuth>
-          }
-        />
-      </Routes>
+      <ToastProvider>
+        <Routes>
+          <Route path="/login" element={<Login />} />
+          <Route
+            path="*"
+            element={
+              <RequireAuth>
+                <Shell />
+              </RequireAuth>
+            }
+          />
+        </Routes>
+      </ToastProvider>
     </AuthProvider>
   );
 }
@@ -30,7 +34,10 @@ function Shell() {
   return (
     <div className="shell">
       <header className="topbar">
-        <span className="brand">onRamp Scraper</span>
+        <span className="brand">
+          <Robot mood="idle" size={22} />
+          onRamp Scraper
+        </span>
         <nav aria-label="Main">
           <NavLink to="/" end>
             Dashboard

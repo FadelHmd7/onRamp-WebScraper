@@ -32,6 +32,17 @@ export interface Crawl {
   done: number;
   counts: Record<UrlStatus, number>;
   errors: number;
+  /** False for a crawl of custom seeds (a demo or re-check); those may overlap. */
+  whole_site?: boolean;
+}
+
+export interface CrawlUrl {
+  url: string;
+  status: UrlStatus;
+  depth: number;
+  attempts: number;
+  last_error: string | null;
+  updated_at: string;
 }
 
 export interface CrawlError {
@@ -73,9 +84,12 @@ export interface DeadLetter {
   attempts: number;
   last_error: string;
   last_status: number | null;
-  status: "dead" | "retried" | "resolved";
+  status: DeadLetterStatus;
   failed_at: string;
+  retried_at?: string | null;
 }
+
+export type DeadLetterStatus = "dead" | "retried" | "resolved";
 
 export interface Site {
   key: string;
@@ -230,7 +244,7 @@ async function detail(response: Response): Promise<string> {
   return `${response.status} ${response.statusText}`;
 }
 
-type Query = Record<string, string | number | undefined | null>;
+type Query = Record<string, string | number | string[] | undefined | null>;
 
 export async function request<T>(
   path: string,
@@ -245,7 +259,11 @@ export async function request<T>(
 ): Promise<T> {
   const url = new URL(BASE + path, window.location.origin);
   for (const [key, value] of Object.entries(options.query ?? {})) {
-    if (value !== undefined && value !== null && value !== "") url.searchParams.set(key, String(value));
+    if (Array.isArray(value)) {
+      for (const item of value) url.searchParams.append(key, item);
+    } else if (value !== undefined && value !== null && value !== "") {
+      url.searchParams.set(key, String(value));
+    }
   }
   const headers: Record<string, string> = { Accept: "application/json" };
   const token = tokenStore.get();
@@ -277,6 +295,8 @@ export const api = {
   sites: () => request<Site[]>("/sites"),
   crawls: (query: Query = {}) => request<Page<Crawl>>("/crawls", { query }),
   crawl: (id: string) => request<CrawlDetail>(`/crawls/${id}`),
+  crawlUrls: (id: string, status: UrlStatus[], limit: number) =>
+    request<Page<CrawlUrl>>(`/crawls/${id}/urls`, { query: { status, limit } }),
   startCrawl: (body: { site: string; mode: "full" | "incremental" }) =>
     request<Crawl>("/crawls", { method: "POST", body }),
   deadLetters: (query: Query = {}) => request<Page<DeadLetter>>("/dlq", { query }),
